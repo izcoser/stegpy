@@ -1,14 +1,12 @@
 # Module for processing images and the last significant bits.
 
-import textwrap
 import numpy
+import codecs
 from PIL import Image
 
-def is_alpha(word):
-     try:
-         return word.encode('ascii').isalpha() or word == ' '
-     except:
-         return False
+def is_allowed(character):
+    symbols = (['?', '!', '@', "#", '$', '%', '^', '&', '*', '(', ')', '.', '-', ' ', ',', ':', ';', '/', '\\', '\n'])
+    return character.isalpha() or character in symbols
 
 def get_image(image_path):
     """Get a numpy array of an image so that one can access values[x][y]."""
@@ -24,9 +22,6 @@ def get_image(image_path):
         return None
     pixel_values = numpy.array(pixel_values).reshape((width, height, channels))
     return pixel_values
-
-def getLast2Digits(binary):
-    return binary[6:8]
 
 def getMessageBinaries(message):
     binaries = []
@@ -49,20 +44,9 @@ def changeLeastSignificantBit(pixels_binaries, message_binaries):
     for binary in pixels_binaries:
         new_pixels_binaries.append(list(binary))
 
-    #print(new_pixels_binaries)
-    #print(new_pixels_binaries[0][8])
-
-    #print(pixels_binaries)
-    #print(message_binaries)
-
     for binary in message_binaries:
         for j in range(0, 7, 2):
-            #print(i)
-            #print(new_pixels_binaries[i])
-            #print(binary);
-            #print("Changing " + new_pixels_binaries[i][6] + " to " + binary[j])
             new_pixels_binaries[i][6] = binary[j]
-            #print("Changing " + new_pixels_binaries[i][7] + " to " + binary[j + 1])
             new_pixels_binaries[i][7] = binary[j + 1]
             i += 1
 
@@ -108,7 +92,6 @@ def insertMessage(message, image_path):
     new_pixels = list(tuple(x) for x in new_pixels)
     im = Image.new('RGB', (len(pixels), len(pixels[0])))
     im.putdata(new_pixels)
-    #im.save('stego_' + image_path)
     im.save(image_path + '.png') #Can't seem to insert messages if I save this as .jpg
 
 
@@ -119,22 +102,24 @@ def readInsertedMessage(image_path, write_to_file = 0):
 
     values = []
     for binary in pixels_binaries:
-        values.append(getLast2Digits(binary))
+        values.append(binary[6:8])
 
-    values = ''.join(values)
-    values = textwrap.wrap(values, 8)
     read_message = []
+    i = 0
+    binary = []
     for value in values:
-        character = chr(int(value, 2))
-        #if(is_alpha(character)):
-        #    read_message.append(character)
-        read_message.append(character)
+        i += 1
+        binary += value
+        if(i == 4):
+            character = chr(int(''.join(binary), 2))
+            i = 0
+            binary = []
+            if(is_allowed(character)):
+                read_message.append(character)
 
     if(write_to_file):
-        with open(image_path + ".txt", "w") as text_file:
+        with codecs.open(image_path + ".txt", "w", 'utf-8-sig') as text_file:
             print(''.join(read_message), file=text_file)
+        print("Information written to " + image_path + ".txt")
     else:
         print(''.join(read_message))
-
-#with open('data_2.txt', 'r') as myfile:
-#    message = myfile.read()
