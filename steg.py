@@ -1,6 +1,9 @@
 import sys
 from lsb import insertMessage, readInsertedMessage
 
+import time
+
+
 '''
 
     Usage:
@@ -8,12 +11,14 @@ from lsb import insertMessage, readInsertedMessage
     Examples:
     python3 steg.py write "Hello World!" image.jpg
     python3 steg.py write -f "data.txt" image.jpg
-    python3 steg.py read image.jpg
-    python3 steg.py read -f image.jpg
+    python3 steg.py read steg_image.jpg
+    python3 steg.py read -f steg_image.jpg
 
 '''
 
 def main():
+    start_time = time.time()
+
     if(sys.argv[1] == 'write'):
         if(sys.argv[2] == '-f'):
             text_file = sys.argv[3]
@@ -36,6 +41,7 @@ def main():
             image_path = sys.argv[2]
 
         readInsertedMessage(image_path, flag)
+    print(time.time() - start_time)
 
 if __name__== "__main__":
     main()
