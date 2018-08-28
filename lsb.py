@@ -14,6 +14,7 @@ def getImage(image_path):
 
 ''' Returns the message as a list of binaries. '''
 def getMessageBinaries(message):
+    #~ return ['{:0>8b}'.format(ord(character)) for character in message]
     binaries = []
     for character in message:
         binaries.append(bin(ord(character))[2:].zfill(8))
@@ -130,4 +131,4 @@ def readInsertedMessage(image_path, write_to_file = 0):
         print(''.join(read_message[:-24]))
 
 if __name__ == "__main__":
-    print(getImage('../fig.png'))
+    print(getMessageBinaries('spam and eggs'))
