@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Module for processing images and the last significant bits.
 
 import numpy
@@ -133,3 +134,6 @@ def readInsertedMessage(image_path, write_to_file = 0):
         print("Information written to " + image_path + ".txt")
     else:
         print(''.join(read_message[:-24]))
+
+if __name__ == "__main__":
+    print(getImage('../fig.png'))
