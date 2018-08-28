@@ -6,23 +6,23 @@ import codecs
 from PIL import Image
 from itertools import chain
 
-''' Returns a numpy array of an image so that one can access values[x][y]. '''
 def getImage(image_path):
+    ''' Returns a numpy array of an image so that one can access values[x][y]. '''
     image = Image.open(image_path)
     if image.mode != 'RGB':
         image = image.convert('RGB')
     return numpy.array(image)
 
-''' Returns the message as a list of binaries. '''
 def getMessageBinaries(message):
+    ''' Returns the message as a list of binaries. '''
     return ['{:0>8b}'.format(ord(character)) for character in message]
 
-''' Returns the pixels as a list of binaries. '''
 def getPixelsBinaries(pixels):
+    ''' Returns the pixels as a list of binaries. '''
     return ['{:0>8b}'.format(pixel) for pixel in chain(*chain(*pixels))]
 
-''' Returns the pixels with encoded message and terminator zeroes as a list of binaries. '''
 def changeLeastSignificantBit(pixels_binaries, message_binaries):
+    ''' Returns the pixels with encoded message and terminator zeroes as a list of binaries. '''
     i = 0
     new_pixels_binaries = list(map(list, pixels_binaries))
 
@@ -38,9 +38,8 @@ def changeLeastSignificantBit(pixels_binaries, message_binaries):
 
     return new_pixels_binaries
 
-
-''' Creates a similar image with the encoded message. '''
 def insertMessage(message, image_path):
+    ''' Creates a similar image with the encoded message. '''
     pixels = getImage(image_path)
 
     number_of_pixels = len(pixels) * len(pixels[0])
@@ -80,9 +79,8 @@ def insertMessage(message, image_path):
     im.putdata(new_pixels)
     im.save('steg_' + image_path, 'PNG')
 
-
-''' Reads inserted message. '''
 def readInsertedMessage(image_path, write_to_file = 0):
+    ''' Reads inserted message. '''
     pixels = getImage(image_path)
     pixels_binaries = getPixelsBinaries(pixels)
 
