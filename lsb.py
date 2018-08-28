@@ -4,6 +4,7 @@
 import numpy
 import codecs
 from PIL import Image
+from itertools import chain
 
 ''' Returns a numpy array of an image so that one can access values[x][y]. '''
 def getImage(image_path):
@@ -14,20 +15,11 @@ def getImage(image_path):
 
 ''' Returns the message as a list of binaries. '''
 def getMessageBinaries(message):
-    #~ return ['{:0>8b}'.format(ord(character)) for character in message]
-    binaries = []
-    for character in message:
-        binaries.append(bin(ord(character))[2:].zfill(8))
-    return binaries
+    return ['{:0>8b}'.format(ord(character)) for character in message]
 
 ''' Returns the pixels as a list of binaries. '''
 def getPixelsBinaries(pixels):
-    binaries = []
-    for pixel_column in pixels:
-        for pixel in pixel_column:
-            for color in pixel:
-                binaries.append(bin(color)[2:].zfill(8))
-    return binaries
+    return ['{:0>8b}'.format(pixel) for pixel in chain(*chain(*pixels))]
 
 ''' Returns the pixels with encoded message and terminator zeroes as a list of binaries. '''
 def changeLeastSignificantBit(pixels_binaries, message_binaries):
@@ -131,4 +123,4 @@ def readInsertedMessage(image_path, write_to_file = 0):
         print(''.join(read_message[:-24]))
 
 if __name__ == "__main__":
-    print(getMessageBinaries('spam and eggs'))
+    print(getPixelsBinaries([[(1,2,3), (4,5,6)]]))
