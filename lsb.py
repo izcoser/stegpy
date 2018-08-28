@@ -7,16 +7,10 @@ from PIL import Image
 
 ''' Returns a numpy array of an image so that one can access values[x][y]. '''
 def getImage(image_path):
-    image = Image.open(image_path, 'r')
-    width, height = image.size
-    pixel_values = list(image.getdata())
-    if image.mode == 'RGB':
-        channels = 3
-    else:
-        print("Image mode not supported yet: %s\nAborting." % image.mode)
-        exit(1)
-    pixel_values = numpy.array(pixel_values).reshape((width, height, channels))
-    return pixel_values
+    image = Image.open(image_path)
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    return numpy.array(image)
 
 ''' Returns the message as a list of binaries. '''
 def getMessageBinaries(message):
