@@ -1,5 +1,5 @@
 import sys
-from lsb import insertMessage, readInsertedMessage
+from lsb import insert_message, read_message
 
 import time
 
@@ -29,7 +29,7 @@ def main():
             message = sys.argv[2]
             image_path = sys.argv[3]
 
-        insertMessage(message, image_path)
+        insert_message(message, image_path)
         print('Done.')
 
     elif(sys.argv[1] == 'read'):
@@ -40,7 +40,7 @@ def main():
             flag = 0
             image_path = sys.argv[2]
 
-        readInsertedMessage(image_path, flag)
+        read_message(image_path, flag)
     print(time.time() - start_time)
 
 if __name__== "__main__":
