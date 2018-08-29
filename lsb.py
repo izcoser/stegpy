@@ -18,65 +18,51 @@ def save_image(array, image_path):
     image = Image.fromarray(array)
     image.save(image_path)
 
-def write_byte(array, idx, char):
-    for i in range(8):
-        if char & 1 << i:
-            array[idx+i] |= 1 # set the bit
-        else:
-            array[idx+i] &= ~1 # clear the bit
-
-def read_byte(array, idx):
-    data = 0
-    for i in range(8):
-        last_bit = array[idx+i] & 1
-        data |= last_bit << i
-    return data
-
 def insert_message(message, image_path):
     ''' Creates a similar image with the encoded message. '''
+    message = (MAGIC_NUMBER + message).encode()
     pixels = getImage(image_path)
     number_of_pixels = pixels.size
     number_of_characters = len(message)
+    max_message_len = number_of_pixels // 8
 
     print("Number of pixels: {:,}".format(number_of_pixels))
     print("Number of characters: {:,}".format(number_of_characters))
-    print("Maximum character storage: {:,}".format(number_of_pixels // 8))
+    print("Maximum character storage: {:,}".format(max_message_len))
 
     if(number_of_pixels < number_of_characters//8):
         print('You have too few pixels to store that information. Aborting.')
-        exit(1)
+        exit(-1)
     else:
         print('Ok.')
 
     # start the work
     shape = pixels.shape
     pixels.shape = -1, # convert to 1D
-
-    i = 0
-    for char in MAGIC_NUMBER:
-        write_byte(pixels, i, ord(char))
-        i += 8
-    for char in message:
-        write_byte(pixels, i, ord(char))
-        i += 8
-    write_byte(pixels, i, 0) # write terminator; 0 is not a valid char, so it makes a good terminator.
+    
+    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+    msg[:len(message)] = list(message)
+    
+    pixels &= 254 # clear the lsb bit for all bytes
+    for i in range(8):
+        pixels[i::8] |= msg >> i & 1
 
     pixels.shape = shape # restore the 3D shape
     save_image(pixels, 'steg_' + image_path)
+    print("Done encoding")
 
 def read_message(image_path, write_to_file=False):
     ''' Reads inserted message. '''
     pixels = getImage(image_path)
     pixels.shape = -1, # convert to 1D
-
-    values = []
-    for i in range(0, len(pixels), 8):
-        data = read_byte(pixels, i)
-        if data:
-            values.append(chr(data))
-        else:
-            break
-    result = ''.join(values)
+    number_of_pixels = pixels.size
+    max_message_len = number_of_pixels // 8
+    
+    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+    for i in range(8):
+        msg |= (pixels[i::8] & 1) << i
+    
+    result = ''.join(chr(x) for x in msg[:msg.argmin()])
 
     if result.startswith(MAGIC_NUMBER):
         result = result[len(MAGIC_NUMBER):]
@@ -93,5 +79,10 @@ def read_message(image_path, write_to_file=False):
 
 if __name__ == "__main__":
     # test code
-    insert_message('hello world', 'fig.png')
+    import time
+    start = time.time()
+    # ~ insert_message('hello world'*15000, 'fig.png')
+    # ~ insert_message('hello world', 'fig.png')
     read_message('steg_fig.png')
+    end = time.time()
+    print('program took {} seconds to run'.format(end-start))
