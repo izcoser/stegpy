@@ -28,6 +28,10 @@ def main():
         else:
             message = sys.argv[2]
             image_path = sys.argv[3]
+        
+        if image_path.lower().endswith(('.jpg', '.jpeg', '.gif')):
+            print("WARNING: you have selected a lossy image format. Your message will probably be corrupted due to image compression.")
+            print("use lossless formats like .png to avoid this")
 
         insert_message(message, image_path)
         print('Done.')

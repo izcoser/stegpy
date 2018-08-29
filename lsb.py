@@ -51,6 +51,13 @@ def insert_message(message, image_path):
     save_image(pixels, 'steg_' + image_path)
     print("Done encoding")
 
+def read_until_zero(array):
+    for byte in array:
+        if byte:
+            yield byte
+        else:
+            return
+            
 def read_message(image_path, write_to_file=False):
     ''' Reads inserted message. '''
     pixels = getImage(image_path)
@@ -62,7 +69,8 @@ def read_message(image_path, write_to_file=False):
     for i in range(8):
         msg |= (pixels[i::8] & 1) << i
     
-    result = ''.join(chr(x) for x in msg[:msg.argmin()])
+    result = bytes(msg[:msg.argmin()]).decode()
+    # ~ result = ''.join(chr(x) for x in msg[:msg.argmin()])
 
     if result.startswith(MAGIC_NUMBER):
         result = result[len(MAGIC_NUMBER):]
@@ -82,7 +90,7 @@ if __name__ == "__main__":
     import time
     start = time.time()
     # ~ insert_message('hello world'*15000, 'fig.png')
-    # ~ insert_message('hello world', 'fig.png')
+    insert_message('hello world', 'fig.png')
     read_message('steg_fig.png')
     end = time.time()
     print('program took {} seconds to run'.format(end-start))
