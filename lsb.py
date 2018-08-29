@@ -4,7 +4,8 @@
 import numpy
 import codecs
 from PIL import Image
-from itertools import chain
+
+MAGIC_NUMBER = 'steg'
 
 def getImage(image_path):
     ''' Returns a numpy array of an image so that one can access values[x][y]. '''
@@ -52,6 +53,9 @@ def insert_message(message, image_path):
     pixels.shape = -1, # convert to 1D
 
     i = 0
+    for char in MAGIC_NUMBER:
+        write_byte(pixels, i, ord(char))
+        i += 8
     for char in message:
         write_byte(pixels, i, ord(char))
         i += 8
@@ -73,6 +77,12 @@ def read_message(image_path, write_to_file=False):
         else:
             break
     result = ''.join(values)
+
+    if result.startswith(MAGIC_NUMBER):
+        result = result[len(MAGIC_NUMBER):]
+    else:
+        print('ERROR! No encoded info found!')
+        exit(-1)
 
     if write_to_file:
         with codecs.open(image_path + ".txt", "w", 'utf-8-sig') as text_file:
