@@ -1,5 +1,5 @@
 import sys
-from lsb import insertMessage, readInsertedMessage
+from lsb import insert_message, read_message
 
 import time
 
@@ -28,8 +28,12 @@ def main():
         else:
             message = sys.argv[2]
             image_path = sys.argv[3]
+        
+        if image_path.lower().endswith(('.jpg', '.jpeg', '.gif')):
+            print("WARNING: you have selected a lossy image format. Your message will probably be corrupted due to image compression.")
+            print("use lossless formats like .png to avoid this")
 
-        insertMessage(message, image_path)
+        insert_message(message, image_path)
         print('Done.')
 
     elif(sys.argv[1] == 'read'):
@@ -40,7 +44,7 @@ def main():
             flag = 0
             image_path = sys.argv[2]
 
-        readInsertedMessage(image_path, flag)
+        read_message(image_path, flag)
     print(time.time() - start_time)
 
 if __name__== "__main__":

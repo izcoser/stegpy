@@ -4,7 +4,8 @@
 import numpy
 import codecs
 from PIL import Image
-from itertools import chain
+
+MAGIC_NUMBER = b'stegv1'
 
 def getImage(image_path):
     ''' Returns a numpy array of an image so that one can access values[x][y]. '''
@@ -13,97 +14,78 @@ def getImage(image_path):
         image = image.convert('RGB')
     return numpy.array(image)
 
-def getMessageBinaries(message):
-    ''' Returns the message as a list of binaries. '''
-    return ['{:0>8b}'.format(ord(character)) for character in message]
+def save_image(array, image_path):
+    image = Image.fromarray(array)
+    image.save(image_path)
 
-def getPixelsBinaries(pixels):
-    ''' Returns the pixels as a list of binaries. '''
-    return ['{:0>8b}'.format(pixel) for pixel in chain(*chain(*pixels))]
-
-def changeLeastSignificantBit(pixels_binaries, message_binaries):
-    ''' Returns the pixels with encoded message and terminator zeroes as a list of binaries. '''
-    i = 0
-    new_pixels_binaries = list(map(list, pixels_binaries))
-
-    for binary in message_binaries:
-        for j in range(0, 7, 2): # 0, 2, 4, 6
-            new_pixels_binaries[i][6] = binary[j]
-            new_pixels_binaries[i][7] = binary[j + 1]
-            i += 1
-
-    for k in range(i, i + 100):
-        new_pixels_binaries[k][6] = '0'
-        new_pixels_binaries[k][7] = '0'
-
-    return new_pixels_binaries
-
-def insertMessage(message, image_path):
-    ''' Creates a similar image with the encoded message. '''
+def insert_message(message, image_path):
+    ''' Creates a similar image with the encoded message. 
+    The message is encoded in utf8
+    there is a 10-byte header. 6 bytes for the magic number and 
+    4 bytes for the length of the message as a 32-bit big endian unsigned integer'''
+    msg_len = len(message).to_bytes(4, 'big')
+    message = MAGIC_NUMBER + msg_len + message.encode('utf-8')
     pixels = getImage(image_path)
-
-    number_of_pixels = len(pixels) * len(pixels[0])
+    number_of_pixels = pixels.size
     number_of_characters = len(message)
-    ratio = number_of_pixels / float(number_of_characters)
+    max_message_len = number_of_pixels // 8
 
-    print("Number of pixels: %d" % number_of_pixels)
-    print("Number of characters: %d" % number_of_characters)
-    print("Maximum character storage: %d" % (number_of_pixels * 3/float(4)))
+    print("Number of pixels: {:,}".format(number_of_pixels))
+    print("Number of characters: {:,}".format(number_of_characters))
+    print("Maximum character storage: {:,}".format(max_message_len))
 
-    if(ratio < 4/float(3)):
+    if(number_of_pixels < number_of_characters//8):
         print('You have too few pixels to store that information. Aborting.')
-        exit(1)
+        exit(-1)
     else:
         print('Ok.')
 
-    message_binaries = getMessageBinaries(message)
-    pixels_binaries = getPixelsBinaries(pixels)
+    # start the work
+    shape = pixels.shape
+    pixels.shape = -1, # convert to 1D
+    
+    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+    msg[:len(message)] = list(message)
+    
+    pixels &= 254 # clear the lsb bit for all bytes
+    for i in range(8):
+        pixels[i::8] |= msg >> i & 1
 
-    new_pixels_binaries = changeLeastSignificantBit(pixels_binaries, message_binaries)
+    pixels.shape = shape # restore the 3D shape
+    save_image(pixels, 'steg_' + image_path)
+    print("Done encoding")
 
-    for i in range(0, number_of_pixels * 3):
-        new_pixels_binaries[i] = ''.join(new_pixels_binaries[i])
-
-    new_pixels = []
-    new_pixel = []
-
-    for i in range(0, len(new_pixels_binaries), 3):
-        new_pixel.append(int(new_pixels_binaries[i], 2))
-        new_pixel.append(int(new_pixels_binaries[i + 1], 2))
-        new_pixel.append(int(new_pixels_binaries[i + 2], 2))
-        new_pixels.append(new_pixel)
-        new_pixel = []
-
-    new_pixels = list(tuple(x) for x in new_pixels)
-    im = Image.new('RGB', (len(pixels[0]), len(pixels)))
-    im.putdata(new_pixels)
-    im.save('steg_' + image_path, 'PNG')
-
-def readInsertedMessage(image_path, write_to_file = 0):
+def read_message(image_path, write_to_file=False):
     ''' Reads inserted message. '''
     pixels = getImage(image_path)
-    pixels_binaries = getPixelsBinaries(pixels)
+    pixels.shape = -1, # convert to 1D
+    number_of_pixels = pixels.size
+    max_message_len = number_of_pixels // 8
+    
+    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+    for i in range(8):
+        msg |= (pixels[i::8] & 1) << i
+    
+    if bytes(msg[0:6]) != MAGIC_NUMBER:
+        print('ERROR! No encoded info found!')
+        exit(-1)
+    
+    msg_len = int.from_bytes(bytes(msg[6:10]), 'big')    
+    result = bytes(msg[10:msg_len+10]).decode('utf-8')
 
-    values = [binary[6:8] for binary in pixels_binaries]
-    values = ''.join(values)
-
-    terminator = '00'*100
-    idx = values.index(terminator) # find the terminator
-    if idx%8:
-        idx += 8-idx%8 # set to the 8-byte boundary
-    values = values[:idx]
-
-    read_message = []
-    for binary in [values[i:i+8] for i in range(0, len(values), 8)]:
-        character = chr(int(binary, 2))
-        read_message.append(character)
-
-    if(write_to_file):
+    if write_to_file:
         with codecs.open(image_path + ".txt", "w", 'utf-8-sig') as text_file:
-            print(''.join(read_message), file=text_file)
+            print(''.join(result), file=text_file)
         print("Information written to " + image_path + ".txt")
     else:
-        print(''.join(read_message))
+        print(''.join(result))
 
 if __name__ == "__main__":
-    print(getPixelsBinaries([[(1,2,3), (4,5,6)]]))
+    # test code
+    import time
+    start = time.time()
+    # ~ insert_message('hello world'*15000, 'fig.png')
+    insert_message('hello world', 'fig.png')
+    read_message('steg_fig.png')
+    end = time.time()
+    print('program took {} seconds to run'.format(end-start))
