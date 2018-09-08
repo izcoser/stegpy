@@ -35,7 +35,7 @@ def insert_message(message, image_path, bits_to_use = 1):
     print("Number of characters: {:,}".format(number_of_characters))
     print("Maximum character storage: {:,}".format(max_message_len))
 
-    if(number_of_pixels < number_of_characters//divisor):
+    if(max_message_len < number_of_characters):
         print('You have too few pixels to store that information. Aborting.')
         exit(-1)
     else:
@@ -95,7 +95,8 @@ def read_message(image_path, write_to_file=False, bits_to_use = 1):
 
     msg_len = int.from_bytes(bytes(msg[6:10]), 'big')
     result = bytes(msg[10:msg_len+10]).decode('utf-8')
-
+    
+    return ''.join(result)
     if write_to_file:
         with codecs.open(image_path + ".txt", "w", 'utf-8-sig') as text_file:
             print(''.join(result), file=text_file)
@@ -107,8 +108,14 @@ if __name__ == "__main__":
     # test code
     import time
     start = time.time()
-    # ~ insert_message('hello world'*15000, 'fig.png')
-    insert_message('hello world', 'fig.png')
-    read_message('steg_fig.png')
+    
+    # ~ insert_message('hello world', 'fig.png')
+    # ~ read_message('steg_fig.png')
+    
+    long_message = 'a'*500000
+    insert_message(long_message, 'fig.png')
+    result = read_message('steg_fig.png')
+    print('correct:', result == long_message)
+    
     end = time.time()
     print('program took {} seconds to run'.format(end-start))
