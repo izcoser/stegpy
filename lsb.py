@@ -37,7 +37,7 @@ def insert_message(message, image_path, bits_to_use = 1):
     print("Number of characters: {:,}".format(number_of_characters))
     print("Maximum character storage: {:,}".format(max_message_len))
 
-    if(number_of_pixels < number_of_characters//divisor):
+    if(max_message_len < number_of_characters):
         print('You have too few pixels to store that information. Aborting.')
         exit(-1)
     else:
