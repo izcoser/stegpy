@@ -21,14 +21,14 @@ def main():
 
     if(sys.argv[1] == 'write'):
         if(sys.argv[2] == '-f'):
-            text_file = sys.argv[3]
-            with open(text_file, 'r') as myfile:
+            input_file = sys.argv[3]
+            with open(input_file, 'rb') as myfile:
                 message = myfile.read()
             image_path = sys.argv[4]
         else:
-            message = sys.argv[2]
+            message = sys.argv[2].encode('utf-8')
             image_path = sys.argv[3]
-        
+
         if image_path.lower().endswith(('.jpg', '.jpeg', '.gif')):
             print("WARNING: you have selected a lossy image format. Your message will probably be corrupted due to image compression.")
             print("use lossless formats like .png to avoid this")
