@@ -7,6 +7,13 @@ from PIL import Image
 
 MAGIC_NUMBER = b'stegv1'
 
+def insert_image(dest, src):
+    ''' Creates an image similar to dest, with src encoded in '''
+    src = get_image(src)
+    shape = src.shape
+    insert_message(bytes(src), dest, 4, shape)
+
+
 def get_image(image_path):
     ''' Returns a numpy array of an image so that one can access values[x][y]. '''
     image = Image.open(image_path)
@@ -18,14 +25,17 @@ def save_image(array, image_path):
     image = Image.fromarray(array)
     image.save(image_path)
 
-def insert_message(message, image_path, bits_to_use = 1):
+def insert_message(message, image_path, bits_to_use = 4, args=None):
     ''' Creates a similar image with the encoded message.
     The message is encoded in utf8. There is a 10-byte header. 6 bytes for the magic number and
     4 bytes for the length of the message as a 32-bit big endian unsigned integer '''
 
-    message = message.encode('utf-8')
-    msg_len = len(message).to_bytes(4, 'big') # msg_len now has the correct value
-    message = MAGIC_NUMBER + msg_len + message # this makes the code much slower
+    msg_len = len(message).to_bytes(4, 'big')
+
+    if(args == None):
+        message = MAGIC_NUMBER + msg_len + message
+    else:
+        message = MAGIC_NUMBER + msg_len + message + args[0].to_bytes(3, 'big') + args[1].to_bytes(3, 'big')
 
 
     pixels = get_image(image_path)
@@ -58,11 +68,14 @@ def insert_message(message, image_path, bits_to_use = 1):
     operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
     pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
 
+    #if(args != None):
+
+
     pixels.shape = shape # restore the 3D shape
     save_image(pixels, 'steg_' + str(bits_to_use) + image_path)
     print("Done encoding")
 
-def read_message(image_path, write_to_file=False):
+def read_message(image_path, write_to_file=False, is_image=False):
     ''' Reads inserted message. '''
     pixels = get_image(image_path)
     pixels.shape = -1, # convert to 1D
@@ -82,7 +95,15 @@ def read_message(image_path, write_to_file=False):
         exit(-1)
 
     msg_len = int.from_bytes(bytes(msg[6:10]), 'big')
-    result = bytes(msg[10:msg_len+10]).decode('utf-8')
+
+    if(is_image):
+        size = [int.from_bytes(bytes(msg[msg_len+13:msg_len+16]), 'big'), int.from_bytes(bytes(msg[msg_len+10:msg_len+13]), 'big')]
+        decoded_image = Image.frombytes('RGB', size, bytes(msg[10:msg_len+10]))
+        decoded_image.save('decoded.png')
+        return
+
+    else:
+        result = bytes(msg[10:msg_len+10]).decode('utf-8')
 
     if write_to_file:
         with codecs.open(image_path[:-3] + "txt", "w", 'utf-8-sig') as text_file:
@@ -92,9 +113,8 @@ def read_message(image_path, write_to_file=False):
         print(''.join(result))
 
 if __name__ == "__main__":
+    '''
     # test code
-    import time
-    start = time.time()
 
     # ~ insert_message('hello world', 'fig.png')
     # ~ read_message('steg_fig.png')
@@ -103,6 +123,12 @@ if __name__ == "__main__":
     insert_message(long_message, 'fig.png')
     result = read_message('steg_fig.png')
     print('correct:', result == long_message)
+
+    '''
+    import time
+    start = time.time()
+    insert_image('Iceland.png', 'test.png')
+    read_message('steg_4Iceland.png', False, True)
 
     end = time.time()
     print('program took {} seconds to run'.format(end-start))
