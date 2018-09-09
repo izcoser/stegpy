@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Module for processing images and the last significant bits.
+# Module for processing images and the least significant bits.
 
 import numpy
 import codecs
@@ -22,9 +22,11 @@ def insert_message(message, image_path, bits_to_use = 1):
     ''' Creates a similar image with the encoded message.
     The message is encoded in utf8
     there is a 10-byte header. 6 bytes for the magic number and
-    4 bytes for the length of the message as a 32-bit big endian unsigned integer'''
-    msg_len = len(message).to_bytes(4, 'big')
-    message = MAGIC_NUMBER + msg_len + message.encode('utf-8')
+    4 bytes for the length of the message as a 32-bit big endian unsigned integer '''
+    message = message.encode('utf-8')
+    msg_len = len(message).to_bytes(4, 'big') # msg_len now has the correct value
+    message = MAGIC_NUMBER + msg_len + message # this makes the code much slower
+
     pixels = get_image(image_path)
     number_of_pixels = pixels.size
     number_of_characters = len(message)
@@ -48,23 +50,12 @@ def insert_message(message, image_path, bits_to_use = 1):
     msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
     msg[:len(message)] = list(message)
 
-    if(bits_to_use == 1):
-        pixels &= 254
-        for i in range(8):
-            pixels[i::8] |= msg >> i & 1
-
-    elif(bits_to_use == 2):
-        pixels &= 252
-        for i in range(4):
-            pixels[i::4] |= msg >> 2*i & 3
-
-    elif(bits_to_use == 4):
-        pixels &= 240
-        for i in range(2):
-            pixels[i::2] |= msg >> 4*i & 15
+    pixels &= 256 - 2 ** bits_to_use # clear last bit(s)
+    for i in range(divisor):
+        pixels[i::divisor] |= msg >> bits_to_use*i & (2 ** bits_to_use - 1) # copy bits to pixels
 
     pixels.shape = shape # restore the 3D shape
-    save_image(pixels, 'steg_' + image_path)
+    save_image(pixels, 'steg_' + str(bits_to_use) + image_path)
     print("Done encoding")
 
 def read_message(image_path, write_to_file=False, bits_to_use = 1):
@@ -77,17 +68,8 @@ def read_message(image_path, write_to_file=False, bits_to_use = 1):
 
     msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
 
-    if(bits_to_use == 1):
-        for i in range(8):
-            msg |= (pixels[i::8] & 1) << i
-
-    elif(bits_to_use == 2):
-        for i in range(4):
-            msg |= (pixels[i::4] & 3) << 2*i
-
-    elif(bits_to_use == 4):
-        for i in range(2):
-            msg |= (pixels[i::2] & 15) << 4*i
+    for i in range(divisor):
+        msg |= (pixels[i::divisor] & (2 ** bits_to_use - 1)) << bits_to_use*i
 
     if bytes(msg[0:6]) != MAGIC_NUMBER:
         print('ERROR! No encoded info found!')
@@ -97,9 +79,9 @@ def read_message(image_path, write_to_file=False, bits_to_use = 1):
     result = bytes(msg[10:msg_len+10]).decode('utf-8')
 
     if write_to_file:
-        with codecs.open(image_path + ".txt", "w", 'utf-8-sig') as text_file:
+        with codecs.open(image_path[:-3] + "txt", "w", 'utf-8-sig') as text_file:
             print(''.join(result), file=text_file)
-        print("Information written to " + image_path + ".txt")
+        print("Information written to " + image_path[:-3] + "txt")
     else:
         print(''.join(result))
 
@@ -107,8 +89,14 @@ if __name__ == "__main__":
     # test code
     import time
     start = time.time()
-    # ~ insert_message('hello world'*15000, 'fig.png')
-    insert_message('hello world', 'fig.png')
-    read_message('steg_fig.png')
+
+    # ~ insert_message('hello world', 'fig.png')
+    # ~ read_message('steg_fig.png')
+
+    long_message = 'a'*500000
+    insert_message(long_message, 'fig.png')
+    result = read_message('steg_fig.png')
+    print('correct:', result == long_message)
+
     end = time.time()
     print('program took {} seconds to run'.format(end-start))
