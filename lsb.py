@@ -20,12 +20,13 @@ def save_image(array, image_path):
 
 def insert_message(message, image_path, bits_to_use = 1):
     ''' Creates a similar image with the encoded message.
-    The message is encoded in utf8
-    there is a 10-byte header. 6 bytes for the magic number and
+    The message is encoded in utf8. There is a 10-byte header. 6 bytes for the magic number and
     4 bytes for the length of the message as a 32-bit big endian unsigned integer '''
+
     message = message.encode('utf-8')
     msg_len = len(message).to_bytes(4, 'big') # msg_len now has the correct value
     message = MAGIC_NUMBER + msg_len + message # this makes the code much slower
+
 
     pixels = get_image(image_path)
     number_of_pixels = pixels.size
@@ -54,19 +55,24 @@ def insert_message(message, image_path, bits_to_use = 1):
     for i in range(divisor):
         pixels[i::divisor] |= msg >> bits_to_use*i & (2 ** bits_to_use - 1) # copy bits to pixels
 
+    operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
+    pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
+
     pixels.shape = shape # restore the 3D shape
     save_image(pixels, 'steg_' + str(bits_to_use) + image_path)
     print("Done encoding")
 
-def read_message(image_path, write_to_file=False, bits_to_use = 1):
+def read_message(image_path, write_to_file=False):
     ''' Reads inserted message. '''
     pixels = get_image(image_path)
     pixels.shape = -1, # convert to 1D
     number_of_pixels = pixels.size
+    bits_to_use = 2 ** ((pixels[0] & 48) >> 4) # bits_to_use = 2 ^ (5th and 6th bits)
     divisor = (8 if (bits_to_use == 1) else (4 if bits_to_use == 2 else 2))
     max_message_len = number_of_pixels // divisor
 
     msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+
 
     for i in range(divisor):
         msg |= (pixels[i::divisor] & (2 ** bits_to_use - 1)) << bits_to_use*i
