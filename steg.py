@@ -1,51 +1,66 @@
 import sys
-from lsb import insert_message, read_message
-
+from lsb import insert_message, read_message, get_image
+from getpass import getpass
 import time
 
+def start_message():
+    print('''
+    steg.py v2
+        Usage: steg.py <command> <switch> <information> <image_name> <switch>
 
-'''
-
-    Usage:
-    python3 steg.py [option] [flag] [message] [filename]
-    Examples:
-    python3 steg.py write "Hello World!" image.jpg
-    python3 steg.py write -f "data.txt" image.jpg
-    python3 steg.py read steg_image.jpg
-    python3 steg.py read -f steg_image.jpg
-
-'''
+<Commands>
+  write: Add information to image
+  read: Read information from image
+<Switches>
+  -f: File input
+  -p: Set password
+    ''')
 
 def main():
-    start_time = time.time()
+    password = None
+    args = None
+    filename = None
 
-    if(sys.argv[1] == 'write'):
-        if(sys.argv[2] == '-f'):
-            input_file = sys.argv[3]
-            with open(input_file, 'rb') as myfile:
-                message = myfile.read()
-            image_path = sys.argv[4]
-        else:
-            message = sys.argv[2].encode('utf-8')
-            image_path = sys.argv[3]
+    if(len(sys.argv) == 1):
+        start_message()
+        return
 
-        if image_path.lower().endswith(('.jpg', '.jpeg', '.gif')):
-            print("WARNING: you have selected a lossy image format. Your message will probably be corrupted due to image compression.")
-            print("use lossless formats like .png to avoid this")
+    else:
 
-        insert_message(message, image_path)
-        print('Done.')
+        if(sys.argv[1] == 'write'):
+            if(sys.argv[2] == '-f'):
+                filename = sys.argv[3]
+                if(filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))):
+                    input_image = get_image(filename)
+                    args = input_image.shape
+                    message = bytes(input_image)
+                else:
+                    with open(filename, 'rb') as myfile:
+                        message = myfile.read()
+                image_path = sys.argv[4]
+            else:
+                message = sys.argv[2].encode('utf-8')
+                image_path = sys.argv[3]
+            if(sys.argv[-1] == '-p'):
+                while True:
+                    password = getpass('Enter password (will not be echoed) :')
+                    password_2 = getpass('Verify password (will not be echoed) :')
+                    if password == password_2:
+                        break;
 
-    elif(sys.argv[1] == 'read'):
-        if(sys.argv[2] == '-f'):
-            flag = 1
-            image_path = sys.argv[3]
-        else:
-            flag = 0
+            insert_message(message, image_path, filename, password, args)
+            print('Done.')
+
+        elif(sys.argv[1] == 'read'):
             image_path = sys.argv[2]
+            if(sys.argv[-1] == '-p'):
+                while True:
+                    password = getpass('Enter password (will not be echoed) :')
+                    password_2 = getpass('Verify password (will not be echoed) :')
+                    if password == password_2:
+                        break;
 
-        read_message(image_path, flag)
-    print(time.time() - start_time)
+            read_message(image_path, password)
 
 if __name__== "__main__":
     main()
