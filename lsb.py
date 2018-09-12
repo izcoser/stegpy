@@ -21,9 +21,9 @@ def save_image(array, image_path):
 
 def insert_message(message, image_path, filename = None, password = None, args = None, bits_to_use = 4):
     ''' Creates a similar image with the encoded message.
-    Text is encoded in utf8. There is a 10-byte header. 6 bytes for the magic number and
-    4 bytes for the length of the message as a 32-bit big endian unsigned integer.
-    When encoding an image, 6 bytes are added to the end to store its dimensions.
+    Text is encoded in utf8. There is a 11-byte header. 6 bytes for the magic number,
+    4 bytes for the length of the message as a 32-bit big endian unsigned integer and
+    1 byte for the length of the filename. When encoding an image, 6 bytes are added to the end to store its dimensions.
     The output image's first byte is also used to tell whether it was encoded with 1, 2 or 4 bits per byte'''
 
     msg_len = len(message).to_bytes(4, 'big')
