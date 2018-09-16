@@ -1,6 +1,6 @@
 # stegpy
 
-A script for embedding information in media files through steganography.
+A script for embedding information in image files through steganography.
 
 Dependencies:
 * numpy
