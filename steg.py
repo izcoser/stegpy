@@ -18,7 +18,6 @@ def start_message():
 
 def main():
     password = None
-    args = None
     filename = None
 
     if(len(sys.argv) == 1):
@@ -30,13 +29,8 @@ def main():
         if(sys.argv[1] == 'write'):
             if(sys.argv[2] == '-f'):
                 filename = sys.argv[3]
-                if(filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))):
-                    input_image = get_image(filename)
-                    args = input_image.shape
-                    message = bytes(input_image)
-                else:
-                    with open(filename, 'rb') as myfile:
-                        message = myfile.read()
+                with open(filename, 'rb') as myfile:
+                    message = myfile.read()
                 image_path = sys.argv[4]
             else:
                 message = sys.argv[2].encode('utf-8')
@@ -48,8 +42,7 @@ def main():
                     if password == password_2:
                         break;
 
-            insert_message(message, image_path, filename, password, args)
-            print('Done.')
+            insert_message(message, image_path, filename, password)
 
         elif(sys.argv[1] == 'read'):
             image_path = sys.argv[2]
