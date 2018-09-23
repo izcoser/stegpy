@@ -1,11 +1,11 @@
 # stegpy
 
-A script for embedding information in image files through steganography.
+A script for hiding information in image files through steganography.
 
 Dependencies:
 * numpy
 * cryptography
-* PIL
+* Pillow (PIL fork)
 ***
 How to use:
 * Hide a message:
