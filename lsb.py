@@ -8,6 +8,64 @@ from crypt import encrypt_info, decrypt_info
 
 MAGIC_NUMBER = b'stegv2'
 
+def prepare_message(message, msg_len, filename=None):
+    ''' Adds header information to the message so that it can be inserted in an image. '''
+    if(filename == None): # text
+        message = MAGIC_NUMBER + msg_len + (0).to_bytes(1, 'big') + message
+    else:
+        filename = filename.encode('utf-8')
+        filename_len = len(filename).to_bytes(1, 'big')
+        message = MAGIC_NUMBER + msg_len + filename_len + filename + message
+    return message;
+
+def check_condition(max_message_len, number_of_characters):
+    ''' Checks if there's enough space to write the message. '''
+    if(max_message_len < number_of_characters):
+        print('You have too few pixels to store that information. Aborting.')
+        exit(-1)
+    else:
+        print('Ok.')
+
+def encode_information(pixels, number_of_pixels, message, divisor, max_message_len, bits_to_use):
+    ''' Encodes the byte array in the image numpy array. '''
+    shape = pixels.shape
+    pixels.shape = -1, # convert to 1D
+
+    if(number_of_pixels % 2 != 0): # Hacky way to deal with images that have an odd number of pixels.
+        msg = numpy.zeros(max_message_len+1, dtype=numpy.uint8)
+        pixels = numpy.resize(pixels, number_of_pixels + 1)
+    else:
+        msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+
+    msg[:len(message)] = list(message)
+
+    pixels[:divisor*len(message)] &= 256 - 2 ** bits_to_use # clear last bit(s)
+    for i in range(divisor):
+        pixels[i::divisor] |= msg >> bits_to_use*i & (2 ** bits_to_use - 1) # copy bits to pixels
+
+    operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
+    pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
+
+    if(number_of_pixels % 2 != 0):
+        pixels = numpy.resize(pixels, number_of_pixels)
+
+    pixels.shape = shape # restore the 3D shape
+    return pixels
+
+def decode_information(pixels, number_of_pixels, divisor, max_message_len, bits_to_use):
+    ''' Decodes the image numpy array into a byte array. '''
+    if(number_of_pixels % 2 != 0):
+        msg = numpy.zeros(max_message_len+1, dtype=numpy.uint8)
+        pixels = numpy.resize(pixels, number_of_pixels + 1)
+
+    else:
+        msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
+
+    for i in range(divisor):
+        msg |= (pixels[i::divisor] & (2 ** bits_to_use - 1)) << bits_to_use*i
+
+    return msg
+
 def get_image(image_path):
     ''' Returns a numpy array of an image so that one can access values[x][y]. '''
     image = Image.open(image_path)
@@ -16,29 +74,19 @@ def get_image(image_path):
     return numpy.array(image)
 
 def save_image(array, image_path):
+    ''' Saves an image. '''
     image = Image.fromarray(array)
     image.save(image_path, 'PNG')
 
-def insert_message(message, image_path, filename = None, password = None, args = None, bits_to_use = 4):
+def insert_message(message, image_path, filename = None, password = None, bits_to_use = 4):
     ''' Creates a similar image with the encoded message.
-    Text is encoded in utf8. There is a 11-byte header. 6 bytes for the magic number,
-    4 bytes for the length of the message as a 32-bit big endian unsigned integer and
-    1 byte for the length of the filename. When encoding an image, 6 bytes are added to the end to store its dimensions.
-    The output image's first byte is also used to tell whether it was encoded with 1, 2 or 4 bits per byte'''
+    There is a 11-byte header. 6 bytes for the magic number, 4 bytes for the length
+    of the message as a 32-bit big endian unsigned integer and 1 byte for the length
+    of the filename. The output image's first byte is also used to tell whether it was
+    encoded with 1, 2 or 4 bits per byte. '''
 
     msg_len = len(message).to_bytes(4, 'big')
-
-    if(filename == None): # text
-        message = MAGIC_NUMBER + msg_len + (0).to_bytes(1, 'big') + message
-    else:
-        filename = filename.encode('utf-8')
-        filename_len = len(filename).to_bytes(1, 'big')
-        if(args == None): # any file that's not an image
-            message = MAGIC_NUMBER + msg_len + filename_len + filename + message
-        elif(args != None): # image
-            width = args[0].to_bytes(3, 'big')
-            height = args[1].to_bytes(3, 'big')
-            message = MAGIC_NUMBER + msg_len + filename_len + filename + message + width + height
+    message = prepare_message(message, msg_len, filename)
 
     if(password != None):
         message = encrypt_info(password, message)
@@ -46,36 +94,17 @@ def insert_message(message, image_path, filename = None, password = None, args =
     pixels = get_image(image_path)
     number_of_pixels = pixels.size
     number_of_characters = len(message)
-    divisor = (8 if (bits_to_use == 1) else (4 if bits_to_use == 2 else 2))
+    divisor = 8 // bits_to_use
     max_message_len = number_of_pixels // divisor
 
-    print("Number of pixels: {:,}".format(number_of_pixels))
-    print("Number of characters: {:,}".format(number_of_characters))
-    print("Maximum character storage: {:,}".format(max_message_len))
+    print("Host dimension: {:,} pixels".format(number_of_pixels))
+    print("Message size: {:,} bytes".format(number_of_characters))
+    print("Maximum size: {:,} bytes".format(max_message_len))
 
-    if(max_message_len < number_of_characters):
-        print('You have too few pixels to store that information. Aborting.')
-        exit(-1)
-    else:
-        print('Ok.')
-
-    # start the work
-    shape = pixels.shape
-    pixels.shape = -1, # convert to 1D
-
-    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
-    msg[:len(message)] = list(message)
-
-    pixels &= 256 - 2 ** bits_to_use # clear last bit(s)
-    for i in range(divisor):
-        pixels[i::divisor] |= msg >> bits_to_use*i & (2 ** bits_to_use - 1) # copy bits to pixels
-
-    operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
-    pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
-
-    pixels.shape = shape # restore the 3D shape
+    check_condition(max_message_len, number_of_characters)
+    pixels = encode_information(pixels, number_of_pixels, message, divisor, max_message_len, bits_to_use)
     save_image(pixels, '_' + image_path)
-    print("Done encoding")
+    print("Message encoded succesfully in {}".format('_' + image_path))
 
 def read_message(image_path, password=None):
     ''' Reads inserted message. '''
@@ -83,13 +112,10 @@ def read_message(image_path, password=None):
     pixels.shape = -1, # convert to 1D
     number_of_pixels = pixels.size
     bits_to_use = 2 ** ((pixels[0] & 48) >> 4) # bits_to_use = 2 ^ (5th and 6th bits)
-    divisor = (8 if (bits_to_use == 1) else (4 if bits_to_use == 2 else 2))
+    divisor = 8 // bits_to_use
     max_message_len = number_of_pixels // divisor
 
-    msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
-
-    for i in range(divisor):
-        msg |= (pixels[i::divisor] & (2 ** bits_to_use - 1)) << bits_to_use*i
+    msg = decode_information(pixels, number_of_pixels, divisor, max_message_len, bits_to_use)
 
     if(password != None):
         try:
@@ -115,20 +141,10 @@ def read_message(image_path, password=None):
         print(text)
         return
 
+    with open(filename, 'wb') as f:
+        f.write(bytes(msg[start:end]))
 
-    if(filename.lower().endswith(('.txt'))):
-        text = bytes(msg[start:end]).decode('utf-8')
-        with codecs.open(filename, "w", 'utf-8-sig') as text_file:
-            print(''.join(text), file=text_file)
-
-    elif(filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))):
-        size = [int.from_bytes(bytes(msg[end+3:end+6]), 'big'), int.from_bytes(bytes(msg[end:end+3]), 'big')]
-        image = Image.frombytes('RGB', size, bytes(msg[start:end]))
-        image.save(filename)
-
-    else:
-        with open(filename, 'wb') as f:
-            f.write(bytes(msg[start:end]))
+    print('File {} succesfully extracted from {}'.format(filename, image_path))
 
 if __name__ == "__main__":
     import time
