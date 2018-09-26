@@ -31,9 +31,9 @@ def encode_information(pixels, number_of_pixels, message, divisor, max_message_l
     shape = pixels.shape
     pixels.shape = -1, # convert to 1D
 
-    if(number_of_pixels % 2 != 0): # Hacky way to deal with images that have an odd number of pixels.
-        msg = numpy.zeros(max_message_len+1, dtype=numpy.uint8)
-        pixels = numpy.resize(pixels, number_of_pixels + 1)
+    if(number_of_pixels % divisor != 0): # Hacky way to deal with pixel arrays that cannot be divided evenly
+        pixels = numpy.resize(pixels, number_of_pixels + (divisor - number_of_pixels % divisor))
+        msg = numpy.zeros(len(pixels) // divisor, dtype=numpy.uint8)
     else:
         msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
 
@@ -46,7 +46,7 @@ def encode_information(pixels, number_of_pixels, message, divisor, max_message_l
     operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
     pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
 
-    if(number_of_pixels % 2 != 0):
+    if(number_of_pixels % divisor != 0):
         pixels = numpy.resize(pixels, number_of_pixels)
 
     pixels.shape = shape # restore the 3D shape
@@ -54,9 +54,9 @@ def encode_information(pixels, number_of_pixels, message, divisor, max_message_l
 
 def decode_information(pixels, number_of_pixels, divisor, max_message_len, bits_to_use):
     ''' Decodes the image numpy array into a byte array. '''
-    if(number_of_pixels % 2 != 0):
-        msg = numpy.zeros(max_message_len+1, dtype=numpy.uint8)
-        pixels = numpy.resize(pixels, number_of_pixels + 1)
+    if(number_of_pixels % divisor != 0):
+        pixels = numpy.resize(pixels, number_of_pixels + (divisor - number_of_pixels % divisor))
+        msg = numpy.zeros(len(pixels) // divisor, dtype=numpy.uint8)
 
     else:
         msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
