@@ -37,4 +37,4 @@ To do:
 * ~Add audio support~
 * ~Support all kinds of files~
 * ~Encrypt information~
-* ???
+* Find a way to use JPEG as host
