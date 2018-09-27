@@ -78,7 +78,7 @@ def save_image(array, image_path):
     image = Image.fromarray(array)
     image.save(image_path, 'PNG')
 
-def insert_message(message, image_path, filename = None, password = None, bits_to_use = 4):
+def insert_message(message, image_path, bits_to_use, filename = None, password = None):
     ''' Creates a similar image with the encoded message.
     There is a 11-byte header. 6 bytes for the magic number, 4 bytes for the length
     of the message as a 32-bit big endian unsigned integer and 1 byte for the length
