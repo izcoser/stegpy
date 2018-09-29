@@ -2,10 +2,13 @@
 
 A script for embedding information in media files through steganography.
 
-![alt text](https://github.com/kamihfkjkf/stegpy/blob/master/images/house.png?raw=true)
-Image of a house with a steganographically hidden image. The hidden image is revealed by removing all but the last significant bit of each color component.
-![alt text](https://raw.githubusercontent.com/kamihfkjkf/stegpy/master/images/_cat.jpeg)
-A cat extracted from the house above.
+<p align="middle">
+  <img src="https://github.com/kamihfkjkf/stegpy/blob/master/images/house.png?raw=true"/>
+  <img src="https://github.com/kamihfkjkf/stegpy/blob/master/images/_cat.jpeg?raw=true"/> 
+</p>
+
+On the left, a house with a steganographically hidden image. On the right, the extracted hidden image of a cat. It is revealed by removing all but the last significant bit of each color component in the host image.
+
 ***
 Dependencies:
 * numpy
