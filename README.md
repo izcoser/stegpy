@@ -1,7 +1,12 @@
 # stegpy
 
-A script for hiding information in image files through steganography.
+A script for embedding information in media files through steganography.
 
+![alt text](https://github.com/kamihfkjkf/stegpy/blob/master/images/house.png?raw=true)
+Image of a house with a steganographically hidden image. The hidden image is revealed by removing all but the last significant bit of each color component.
+![alt text](https://raw.githubusercontent.com/kamihfkjkf/stegpy/master/images/_cat.jpeg)
+A cat extracted from the house above.
+***
 Dependencies:
 * numpy
 * cryptography
