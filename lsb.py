@@ -96,6 +96,7 @@ def insert_message(message, image_path, bits_to_use, filename = None, password =
     number_of_characters = len(message)
     divisor = 8 // bits_to_use
     max_message_len = number_of_pixels // divisor
+    image_path = '_' + image_path[:-3] + 'png'
 
     print("Host dimension: {:,} pixels".format(number_of_pixels))
     print("Message size: {:,} bytes".format(number_of_characters))
@@ -103,8 +104,8 @@ def insert_message(message, image_path, bits_to_use, filename = None, password =
 
     check_condition(max_message_len, number_of_characters)
     pixels = encode_information(pixels, number_of_pixels, message, divisor, max_message_len, bits_to_use)
-    save_image(pixels, '_' + image_path)
-    print("Message encoded succesfully in {}".format('_' + image_path))
+    save_image(pixels, image_path)
+    print("Message encoded succesfully in {}".format(image_path))
 
 def read_message(image_path, password=None):
     ''' Reads inserted message. '''
