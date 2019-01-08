@@ -1,6 +1,6 @@
 # stegpy
 
-A script for embedding information in media files through steganography.
+A program for encoding information in image files through steganography.
 
 <p align="middle">
   <img src="https://github.com/kamihfkjkf/stegpy/blob/master/images/house.png?raw=true"/>
@@ -26,7 +26,7 @@ $ python3 steg.py "Hello World!" image.png
 ```
 * Hide a file:
 ```sh
-$ python3 steg.py write file.whatever image.png
+$ python3 steg.py file.whatever image.png
 ```
 * Encrypt:
 ```sh
