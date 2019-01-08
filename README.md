@@ -30,12 +30,12 @@ $ python3 steg.py file.whatever image.png
 ```
 * Encrypt:
 ```sh
-$ python3 steg.py write "Hello World!" image.png -p
-$ Enter password (will not be echoed):
-$ Verify password (will not be echoed):
+$ python3 steg.py "Hello World!" image.png -p
+Enter password (will not be echoed):
+Verify password (will not be echoed):
 $ python3 steg.py _image.png -p
-$ Enter password (will not be echoed):
-$ Hello World!
+Enter password (will not be echoed):
+Hello World!
 ```
 ***
 To do:
