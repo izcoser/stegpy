@@ -1,15 +1,67 @@
 #!/usr/bin/env python3
-# Module for processing images and the least significant bits.
+# Module for processing images, audios and the least significant bits.
 
 import numpy
-import codecs
 from PIL import Image
 from crypt import encrypt_info, decrypt_info
 
 MAGIC_NUMBER = b'stegv2'
 
-def prepare_message(message, msg_len, filename=None):
-    ''' Adds header information to the message so that it can be inserted in an image. '''
+def get_host(host_path):
+    ''' Returns a numpy array of a host file so that one can access values[x][y]. '''
+    if host_path[-3:].lower() == 'wav':
+        sound = numpy.fromfile(host_path, dtype=numpy.uint8)
+        header = sound[:180]
+        data = sound[180:]
+        return [header, data]
+    else:
+        image = Image.open(host_path)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        return numpy.array(image)
+
+
+def save_host(array, host_path, wav_header = None):
+    ''' Saves the host. '''
+    if host_path[-3:].lower() == 'wav':
+        array = numpy.concatenate((wav_header, array))
+        array.tofile(host_path)
+    else:
+        image = Image.fromarray(array)
+        image.save(host_path)
+
+def insert_message(message, host_path, bits, filename = None, password = None):
+    ''' Creates a similar file with the encoded message.
+    There is an 11-byte header. 6 bytes for the magic number, 4 bytes for the length
+    of the message as a 32-bit big endian unsigned integer and 1 byte for the length
+    of the filename. The output file's first byte is also used to tell whether it was
+    encoded with 1, 2 or 4 bits per byte. '''
+
+    raw_message_len = len(message).to_bytes(4, 'big')
+    formatted_message = format_message(message, raw_message_len, filename)
+
+    if(password != None):
+        formatted_message = encrypt_info(password, formatted_message)
+
+    host_data = get_host(host_path)
+
+    extension = host_path[-3:]
+    wav_header = None
+    if extension.lower() == 'wav':
+        wav_header = host_data[0]
+        host_data = host_data[1]
+
+    elif extension.lower() not in ['png', 'bmp']:
+        print("Host has a lossy format and will be converted to PNG.")
+        host_path = host_path[:-3] + 'png'
+   
+    host_path = '_' + host_path    
+    host_data = encode_message(host_data, formatted_message, bits)
+    save_host(host_data, host_path, wav_header)
+    print("Message encoded succesfully in {}".format(host_path))
+
+def format_message(message, msg_len, filename=None):
+    ''' Adds header message to the message so that it can be inserted in an image. '''
     if(filename == None): # text
         message = MAGIC_NUMBER + msg_len + (0).to_bytes(1, 'big') + message
     else:
@@ -18,105 +70,63 @@ def prepare_message(message, msg_len, filename=None):
         message = MAGIC_NUMBER + msg_len + filename_len + filename + message
     return message;
 
-def check_condition(max_message_len, number_of_characters):
+def encode_message(host_data, message, bits):
+    ''' Encodes the byte array in the image numpy array. '''
+    shape = host_data.shape
+    host_data.shape = -1, # convert to 1D
+    uneven = 0
+    divisor = 8 // bits
+
+    print("Host dimension: {:,} bytes".format(host_data.size))
+    print("Message size: {:,} bytes".format(len(message)))
+    print("Maximum size: {:,} bytes".format(host_data.size // divisor))
+
+    check_message_space(host_data.size // divisor, len(message))
+ 
+    if(host_data.size % divisor != 0): # Hacky way to deal with pixel arrays that cannot be divided evenly
+        uneven = 1
+        original_size = host_data.size
+        host_data = numpy.resize(host_data, host_data.size + (divisor - host_data.size % divisor))
+        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+    else:
+        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+
+    msg[:len(message)] = list(message)
+
+    host_data[:divisor*len(message)] &= 256 - 2 ** bits # clear last bit(s)
+    for i in range(divisor):
+        host_data[i::divisor] |= msg >> bits*i & (2 ** bits - 1) # copy bits to host_data
+
+    operand = (0 if (bits == 1) else (16 if (bits == 2) else 32))
+    host_data[0] = (host_data[0] & 207) | operand # 5th and 6th bits = log_2(bits)
+
+    if uneven:
+        host_data = numpy.resize(host_data, original_size)
+    
+    host_data.shape = shape # restore the 3D shape
+    
+    return host_data
+
+def check_message_space(max_message_len, message_len):
     ''' Checks if there's enough space to write the message. '''
-    if(max_message_len < number_of_characters):
-        print('You have too few pixels to store that information. Aborting.')
+    if(max_message_len < message_len):
+        print('You have too few colors to store that message. Aborting.')
         exit(-1)
     else:
         print('Ok.')
 
-def encode_information(pixels, number_of_pixels, message, divisor, max_message_len, bits_to_use):
-    ''' Encodes the byte array in the image numpy array. '''
-    shape = pixels.shape
-    pixels.shape = -1, # convert to 1D
-
-    if(number_of_pixels % divisor != 0): # Hacky way to deal with pixel arrays that cannot be divided evenly
-        pixels = numpy.resize(pixels, number_of_pixels + (divisor - number_of_pixels % divisor))
-        msg = numpy.zeros(len(pixels) // divisor, dtype=numpy.uint8)
-    else:
-        msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
-
-    msg[:len(message)] = list(message)
-
-    pixels[:divisor*len(message)] &= 256 - 2 ** bits_to_use # clear last bit(s)
-    for i in range(divisor):
-        pixels[i::divisor] |= msg >> bits_to_use*i & (2 ** bits_to_use - 1) # copy bits to pixels
-
-    operand = (0 if (bits_to_use == 1) else (16 if (bits_to_use == 2) else 32))
-    pixels[0] = (pixels[0] & 207) | operand # 5th and 6th bits = log_2(bits_to_use)
-
-    if(number_of_pixels % divisor != 0):
-        pixels = numpy.resize(pixels, number_of_pixels)
-
-    pixels.shape = shape # restore the 3D shape
-    return pixels
-
-def decode_information(pixels, number_of_pixels, divisor, max_message_len, bits_to_use):
-    ''' Decodes the image numpy array into a byte array. '''
-    if(number_of_pixels % divisor != 0):
-        pixels = numpy.resize(pixels, number_of_pixels + (divisor - number_of_pixels % divisor))
-        msg = numpy.zeros(len(pixels) // divisor, dtype=numpy.uint8)
-
-    else:
-        msg = numpy.zeros(max_message_len, dtype=numpy.uint8)
-
-    for i in range(divisor):
-        msg |= (pixels[i::divisor] & (2 ** bits_to_use - 1)) << bits_to_use*i
-
-    return msg
-
-def get_image(image_path):
-    ''' Returns a numpy array of an image so that one can access values[x][y]. '''
-    image = Image.open(image_path)
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-    return numpy.array(image)
-
-def save_image(array, image_path):
-    ''' Saves an image. '''
-    image = Image.fromarray(array)
-    image.save(image_path, 'PNG')
-
-def insert_message(message, image_path, bits_to_use, filename = None, password = None):
-    ''' Creates a similar image with the encoded message.
-    There is a 11-byte header. 6 bytes for the magic number, 4 bytes for the length
-    of the message as a 32-bit big endian unsigned integer and 1 byte for the length
-    of the filename. The output image's first byte is also used to tell whether it was
-    encoded with 1, 2 or 4 bits per byte. '''
-
-    msg_len = len(message).to_bytes(4, 'big')
-    message = prepare_message(message, msg_len, filename)
-
-    if(password != None):
-        message = encrypt_info(password, message)
-
-    pixels = get_image(image_path)
-    number_of_pixels = pixels.size
-    number_of_characters = len(message)
-    divisor = 8 // bits_to_use
-    max_message_len = number_of_pixels // divisor
-    image_path = '_' + image_path[:-3] + 'png'
-
-    print("Host dimension: {:,} pixels".format(number_of_pixels))
-    print("Message size: {:,} bytes".format(number_of_characters))
-    print("Maximum size: {:,} bytes".format(max_message_len))
-
-    check_condition(max_message_len, number_of_characters)
-    pixels = encode_information(pixels, number_of_pixels, message, divisor, max_message_len, bits_to_use)
-    save_image(pixels, image_path)
-    print("Message encoded succesfully in {}".format(image_path))
-
-def read_message(image_path, password=None):
+def read_message(host_path, password=None):
     ''' Reads inserted message. '''
-    pixels = get_image(image_path)
-    pixels.shape = -1, # convert to 1D
-    number_of_pixels = pixels.size
-    bits_to_use = 2 ** ((pixels[0] & 48) >> 4) # bits_to_use = 2 ^ (5th and 6th bits)
-    divisor = 8 // bits_to_use
-    max_message_len = number_of_pixels // divisor
+    host_data = get_host(host_path)
+        
+    extension = host_path[-3:]
+ 
+    if extension.lower() == 'wav':
+        host_data = host_data[1]
 
-    msg = decode_information(pixels, number_of_pixels, divisor, max_message_len, bits_to_use)
+    host_data.shape = -1, # convert to 1D
+    bits = 2 ** ((host_data[0] & 48) >> 4) # bits = 2 ^ (5th and 6th bits)
+    msg = decode_message(host_data, bits)
 
     if(password != None):
         try:
@@ -145,7 +155,24 @@ def read_message(image_path, password=None):
     with open(filename, 'wb') as f:
         f.write(bytes(msg[start:end]))
 
-    print('File {} succesfully extracted from {}'.format(filename, image_path))
+    print('File {} succesfully extracted from {}'.format(filename, host_path))
+
+def decode_message(host_data, bits):
+    ''' Decodes the image numpy array into a byte array. '''
+    
+    divisor = 8 // bits
+
+    if(host_data.size % divisor != 0):
+        host_data = numpy.resize(host_data, host_data.size + (divisor - host_data.size % divisor))
+        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+
+    else:
+        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+
+    for i in range(divisor):
+        msg |= (host_data[i::divisor] & (2 ** bits - 1)) << bits*i
+
+    return msg
 
 if __name__ == "__main__":
     import time

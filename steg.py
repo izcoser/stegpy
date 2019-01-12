@@ -1,7 +1,7 @@
 import sys
 import argparse
 import os.path
-from lsb import insert_message, read_message, get_image
+from lsb import insert_message, read_message
 from getpass import getpass
 
 def main():
@@ -9,12 +9,12 @@ def main():
     parser.add_argument('a', help='file or message to encode (if none, will read host)', nargs='?')
     parser.add_argument('b', help='host image')
     parser.add_argument('-p', '--password', help='encrypt/decrypt hidden file', action='store_true')
-    parser.add_argument('-b', '--bits', help='number of LSB bits per byte (default is 2)', action='store_true')
+    parser.add_argument('-b', '--bits', help='number of bits per byte (default is 2)', action='store_true')
     args = parser.parse_args()
     
     password = filename = None
     bits = 2
-    image_path = args.b
+    host_path = args.b
 
     if args.a:
         if os.path.isfile(args.a):
@@ -35,11 +35,11 @@ def main():
                 bits = 2
 
 
-        insert_message(message, image_path, bits, filename, password)
+        insert_message(message, host_path, bits, filename, password)
     else:
         if args.password:
             password = getpass('Enter password (will not be echoed):')
-        read_message(image_path, password)
+        read_message(host_path, password)
 
 if __name__== "__main__":
     main()
