@@ -14,8 +14,8 @@ Supported host formats:
 * PNG
 * BMP
 * WAV
+
 Images in a different format are automatically converted to PNG. Different audio formats are not supported at all.
-***
 
 ***
 Dependencies:
