@@ -87,9 +87,8 @@ def encode_message(host_data, message, bits):
         uneven = 1
         original_size = host_data.size
         host_data = numpy.resize(host_data, host_data.size + (divisor - host_data.size % divisor))
-        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
-    else:
-        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+
+    msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
 
     msg[:len(message)] = list(message)
 
@@ -164,10 +163,8 @@ def decode_message(host_data, bits):
 
     if(host_data.size % divisor != 0):
         host_data = numpy.resize(host_data, host_data.size + (divisor - host_data.size % divisor))
-        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
 
-    else:
-        msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
+    msg = numpy.zeros(len(host_data) // divisor, dtype=numpy.uint8)
 
     for i in range(divisor):
         msg |= (host_data[i::divisor] & (2 ** bits - 1)) << bits*i
