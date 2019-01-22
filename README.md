@@ -23,8 +23,7 @@ Dependencies:
 * cryptography
 * Pillow (PIL fork)
 ```sh
-$ sudo apt-get install python3-numpy python3-cryptography
-$ sudo pip install Pillow
+$ pip install -r  requirements.txt
 ```
 ***
 How to use:
