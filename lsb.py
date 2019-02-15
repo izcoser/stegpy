@@ -129,7 +129,8 @@ def read_message(host_path, password=None):
 
     if(password != None):
         try:
-            msg = decrypt_info(password, bytes(msg))
+            salt = bytes(msg[:16])
+            msg = decrypt_info(password, bytes(msg[16:]), salt)
         except:
             print("Wrong password.")
             return

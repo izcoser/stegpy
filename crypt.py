@@ -8,29 +8,31 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-def derive_key(password):
+def derive_key(password, salt=None):
+    if salt == None:
+        salt = os.urandom(16)
     kdf = PBKDF2HMAC(
          algorithm=hashes.SHA256(),
          length=32,
-         salt=bytes(('whatever').encode('utf-8')),
+         salt=salt,
          iterations=100000,
          backend=default_backend()
      )
 
-    return base64.urlsafe_b64encode(kdf.derive(password))
+    return [base64.urlsafe_b64encode(kdf.derive(password)), salt]
 
 def encrypt_info(password, info):
     ''' Receives a password and a byte array. Returns a Fernet token. '''
     password = bytes((password).encode('utf-8'))
-    key = derive_key(password)
+    key, salt = derive_key(password)
     f = Fernet(key)
     token = f.encrypt(info)
-    return token
+    return bytes(salt) + bytes(token)
 
-def decrypt_info(password, token):
+def decrypt_info(password, token, salt):
     ''' Receives a password and a Fernet token. Returns a byte array. '''
     password = bytes((password).encode('utf-8'))
-    key = derive_key(password)
+    key = derive_key(password, salt)[0]
     f = Fernet(key)
     info = f.decrypt(token)
     return info
