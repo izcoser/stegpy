@@ -47,10 +47,5 @@ Hello World!
 ```
 ***
 To do:
-* ~Fix some types of images not working~
-* ~Improve reading speed~
-* ~Add image support~
-* ~Add audio support~
-* ~Support all kinds of files~
-* ~Encrypt information~
-* Support JPEG as host
+* Fix first pixel
+* Support GIF & JPEG as host
