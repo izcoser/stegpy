@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 def derive_key(password, salt=None):
-    if salt == None:
+    if not salt:
         salt = os.urandom(16)
     kdf = PBKDF2HMAC(
          algorithm=hashes.SHA256(),
