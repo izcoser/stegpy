@@ -1,7 +1,7 @@
 import sys
 import argparse
 import os.path
-from lsb import insert_message, read_message
+from lsb import HostElement
 from getpass import getpass
 
 def main():
@@ -15,6 +15,7 @@ def main():
     password = filename = None
     bits = 2
     host_path = args.b
+    host = HostElement(host_path)
 
     if args.a:
         if os.path.isfile(args.a):
@@ -33,13 +34,13 @@ def main():
             bits = int(input('Number of LSB bits to encode in each byte (1, 2, 4):'))
             if bits not in [1, 2, 4]:
                 bits = 2
-
-
-        insert_message(message, host_path, bits, filename, password)
+        
+        host.insert_message(message, bits, filename, password)
+        host.save()
     else:
         if args.password:
             password = getpass('Enter password (will not be echoed):')
-        read_message(host_path, password)
+        host.read_message(password)
 
 if __name__== "__main__":
     main()

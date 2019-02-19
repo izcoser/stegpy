@@ -5,64 +5,86 @@ import numpy
 from PIL import Image
 from crypt import encrypt_info, decrypt_info
 
-MAGIC_NUMBER = b'stegv2'
+MAGIC_NUMBER = b'stegv3'
 
-def get_host(host_path):
+class HostElement:
+    """ This class holds information about a host element. """
+    def __init__(self, filename):
+        self.filename = filename
+        self.format = filename[-3:]
+        self.header, self.data = get_file(filename)
+
+    def save(self):
+        if self.format.lower() == 'wav':
+            sound = numpy.concatenate((self.header, self.data))
+            sound.tofile('_' + self.filename)
+        else:
+            if not self.filename.lower().endswith(('png', 'bmp')):
+                print("Host has a lossy format and will be converted to PNG.")
+                image = Image.fromarray(self.data)
+                image.save('_' + self.filename[:-3] + 'png')
+
+    def insert_message(self, message, bits=2, parasite_filename=None, password=None):
+        raw_message_len = len(message).to_bytes(4, 'big')
+        formatted_message = format_message(message, raw_message_len, parasite_filename)
+        if password:
+            formatted_message = encrypt_info(password, formatted_message)
+        self.data = encode_message(self.data, formatted_message, bits)
+
+    def read_message(self, password=None):
+        msg = decode_message(self.data)
+        
+        if password:
+            try:
+                salt = bytes(msg[:16])
+                msg = decrypt_info(password, bytes(msg[16:]), salt)
+            except:
+                print("Wrong password.")
+                return
+
+        check_magic_number(msg)
+        msg_len = int.from_bytes(bytes(msg[6:10]), 'big')
+        filename_len = int.from_bytes(bytes(msg[10:11]), 'big')
+
+        start = filename_len + 11
+        end = start + msg_len
+        end_filename = filename_len + 11
+        if(filename_len > 0):
+            filename = '_' + bytes(msg[11:end_filename]).decode('utf-8')
+        
+        else:
+            text = bytes(msg[start:end]).decode('utf-8')
+            print(text)
+            return
+
+        with open(filename, 'wb') as f:
+            f.write(bytes(msg[start:end]))
+
+        print('File {} succesfully extracted from {}'.format(filename, '_' + self.filename))
+
+    def free_space(self, bits=2):
+        shape = self.data.shape
+        self.data.shape = -1
+        free = self.data.size * bits // 8
+        self.data.shape = shape
+        self.free = free
+        return free
+
+def get_file(filename):
     ''' Returns a numpy array of a host file so that one can access values[x][y]. '''
-    if host_path[-3:].lower() == 'wav':
-        sound = numpy.fromfile(host_path, dtype=numpy.uint8)
-        header = sound[:180]
-        data = sound[180:]
-        return [header, data]
+    if filename.lower().endswith('wav'): # There's a problem with WAV files. Their header has variable length, some of them contain little information, others contain even the lyrics.
+        # Maybe I should drop them, or use something to separate exactly their data and header.
+        content = numpy.fromfile(filename, dtype=numpy.uint8)
+        content = content[:200], content[200:]
     else:
-        image = Image.open(host_path)
+        image = Image.open(filename)
         if image.mode != 'RGB':
             image = image.convert('RGB')
-        return numpy.array(image)
-
-
-def save_host(array, host_path, wav_header = None):
-    ''' Saves the host. '''
-    if host_path[-3:].lower() == 'wav':
-        array = numpy.concatenate((wav_header, array))
-        array.tofile(host_path)
-    else:
-        image = Image.fromarray(array)
-        image.save(host_path)
-
-def insert_message(message, host_path, bits, filename = None, password = None):
-    ''' Creates a similar file with the encoded message.
-    There is an 11-byte header. 6 bytes for the magic number, 4 bytes for the length
-    of the message as a 32-bit big endian unsigned integer and 1 byte for the length
-    of the filename. The output file's first byte is also used to tell whether it was
-    encoded with 1, 2 or 4 bits per byte. '''
-
-    raw_message_len = len(message).to_bytes(4, 'big')
-    formatted_message = format_message(message, raw_message_len, filename)
-
-    if(password != None):
-        formatted_message = encrypt_info(password, formatted_message)
-
-    host_data = get_host(host_path)
-
-    extension = host_path[-3:]
-    wav_header = None
-    if extension.lower() == 'wav':
-        wav_header = host_data[0]
-        host_data = host_data[1]
-
-    elif extension.lower() not in ['png', 'bmp']:
-        print("Host has a lossy format and will be converted to PNG.")
-        host_path = host_path[:-3] + 'png'
-   
-    host_path = '_' + host_path    
-    host_data = encode_message(host_data, formatted_message, bits)
-    save_host(host_data, host_path, wav_header)
-    print("Message encoded succesfully in {}".format(host_path))
+        content = None, numpy.array(image)
+    return content
 
 def format_message(message, msg_len, filename=None):
-    ''' Adds header message to the message so that it can be inserted in an image. '''
-    if(filename == None): # text
+    if not filename: # text
         message = MAGIC_NUMBER + msg_len + (0).to_bytes(1, 'big') + message
     else:
         filename = filename.encode('utf-8')
@@ -114,52 +136,10 @@ def check_message_space(max_message_len, message_len):
     else:
         print('Ok.')
 
-def read_message(host_path, password=None):
-    ''' Reads inserted message. '''
-    host_data = get_host(host_path)
-        
-    extension = host_path[-3:]
- 
-    if extension.lower() == 'wav':
-        host_data = host_data[1]
-
-    host_data.shape = -1, # convert to 1D
-    bits = 2 ** ((host_data[0] & 48) >> 4) # bits = 2 ^ (5th and 6th bits)
-    msg = decode_message(host_data, bits)
-
-    if(password != None):
-        try:
-            salt = bytes(msg[:16])
-            msg = decrypt_info(password, bytes(msg[16:]), salt)
-        except:
-            print("Wrong password.")
-            return
-
-    if bytes(msg[0:6]) != MAGIC_NUMBER:
-        print('ERROR! No encoded info found!')
-        exit(-1)
-
-    msg_len = int.from_bytes(bytes(msg[6:10]), 'big')
-    filename_len = int.from_bytes(bytes(msg[10:11]), 'big')
-
-    start = filename_len + 11
-    end = start + msg_len
-
-    if(filename_len > 0):
-        filename = '_' + bytes(msg[11:start]).decode('utf-8')
-    else:
-        text = bytes(msg[start:end]).decode('utf-8')
-        print(text)
-        return
-
-    with open(filename, 'wb') as f:
-        f.write(bytes(msg[start:end]))
-
-    print('File {} succesfully extracted from {}'.format(filename, host_path))
-
-def decode_message(host_data, bits):
+def decode_message(host_data):
     ''' Decodes the image numpy array into a byte array. '''
-    
+    host_data.shape = -1, # convert to 1D
+    bits = 2 ** ((host_data[0] & 48) >> 4) # bits = 2 ^ (5th and 6th bits)    
     divisor = 8 // bits
 
     if(host_data.size % divisor != 0):
@@ -172,13 +152,18 @@ def decode_message(host_data, bits):
 
     return msg
 
-if __name__ == "__main__":
-    import time
-    start = time.time()
-    # Tested: text, text file, image, audio, video, 7z
-    with open('testie.7z', 'rb') as myfile:
-        message = myfile.read()
-    insert_message(message, 'Iceland.png', 'testie.7z', '123')
-    read_message('_Iceland.png', '123')
-    end = time.time()
-    print('program took {} seconds to run'.format(end-start))
+def check_magic_number(msg):
+    if bytes(msg[0:6]) != MAGIC_NUMBER:
+        print(bytes(msg[:6]))
+        print('ERROR! No encoded info found!')
+        exit(-1)
+
+if __name__ == '__main__':
+    with open('hue.7z', 'rb') as f:
+        message = f.read()
+    host = HostElement('high_res.jpg')
+    print(host.free_space(4))
+    host.insert_message(message, bits=4, parasite_filename='hue.7z')
+    host.save()
+    host2 = HostElement('_high_res.png')
+    host2.read_message()
