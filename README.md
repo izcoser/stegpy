@@ -46,5 +46,8 @@ Hello World!
 ```
 ***
 To do:
+* Add docstrings
+* Allow encoding across multiple files
+* Use a proper header separator for audios
 * Fix first pixel
-* Support GIF & JPEG as host
+* Support GIF, JPEG, FLAC as host
