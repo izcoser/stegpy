@@ -10,7 +10,7 @@ MAGIC_NUMBER = b'stegv3'
 class HostElement:
     """ This class holds information about a host element. """
     def __init__(self, filename):
-        self.filename = filename
+        self.filename = '_' + filename
         self.format = filename[-3:]
         self.header, self.data = get_file(filename)
 
@@ -21,8 +21,9 @@ class HostElement:
         else:
             if not self.filename.lower().endswith(('png', 'bmp')):
                 print("Host has a lossy format and will be converted to PNG.")
-                image = Image.fromarray(self.data)
-                image.save('_' + self.filename[:-3] + 'png')
+                self.filename = self.filename[:-3] + 'png'
+            image = Image.fromarray(self.data)
+            image.save(self.filename)
 
     def insert_message(self, message, bits=2, parasite_filename=None, password=None):
         raw_message_len = len(message).to_bytes(4, 'big')
