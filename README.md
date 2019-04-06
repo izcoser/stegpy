@@ -13,6 +13,7 @@ On the left, a house with a steganographically hidden image. On the right, the e
 Supported host formats:
 * PNG
 * BMP
+* GIF
 * WAV
 
 Images in a different format are automatically converted to PNG. Different audio formats are not supported at all.
@@ -50,4 +51,4 @@ To do:
 * Allow encoding across multiple files
 * Use a proper header separator for audios
 * Fix first pixel
-* Support GIF, JPEG, FLAC as host
+* Support JPEG & FLAC as hosts
