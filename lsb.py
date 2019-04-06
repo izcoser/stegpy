@@ -10,20 +10,29 @@ MAGIC_NUMBER = b'stegv3'
 class HostElement:
     """ This class holds information about a host element. """
     def __init__(self, filename):
-        self.filename = '_' + filename
+        self.filename = filename
         self.format = filename[-3:]
         self.header, self.data = get_file(filename)
 
     def save(self):
+        self.filename = '_' + self.filename
         if self.format.lower() == 'wav':
             sound = numpy.concatenate((self.header, self.data))
-            sound.tofile('_' + self.filename)
+            sound.tofile(self.filename)
+        elif self.format.lower() == 'gif':
+            gif = []
+            for frame, palette in zip(self.data, self.header[0]):
+                image = Image.fromarray(frame)
+                image.putpalette(palette)
+                gif.append(image)
+            gif[0].save(self.filename, save_all=True, append_images = gif[1:], loop=0, duration=self.header[1])
         else:
             if not self.filename.lower().endswith(('png', 'bmp')):
                 print("Host has a lossy format and will be converted to PNG.")
                 self.filename = self.filename[:-3] + 'png'
             image = Image.fromarray(self.data)
             image.save(self.filename)
+        print("Information encoded in {}.".format(self.filename))
 
     def insert_message(self, message, bits=2, parasite_filename=None, password=None):
         raw_message_len = len(message).to_bytes(4, 'big')
@@ -61,7 +70,7 @@ class HostElement:
         with open(filename, 'wb') as f:
             f.write(bytes(msg[start:end]))
 
-        print('File {} succesfully extracted from {}'.format(filename, '_' + self.filename))
+        print('File {} succesfully extracted from {}'.format(filename, self.filename))
 
     def free_space(self, bits=2):
         shape = self.data.shape
@@ -77,6 +86,18 @@ def get_file(filename):
         # Maybe I should drop them, or use something to separate exactly their data and header.
         content = numpy.fromfile(filename, dtype=numpy.uint8)
         content = content[:200], content[200:]
+    elif filename.lower().endswith('gif'):
+        image = Image.open(filename)
+        frames = []
+        palettes = []
+        try:
+            while True:
+                frames.append(numpy.array(image))
+                palettes.append(image.getpalette())
+                image.seek(image.tell()+1)
+        except EOFError:
+            pass
+        content = [palettes, image.info['duration']], numpy.asarray(frames)
     else:
         image = Image.open(filename)
         if image.mode != 'RGB':
@@ -160,11 +181,7 @@ def check_magic_number(msg):
         exit(-1)
 
 if __name__ == '__main__':
-    with open('hue.7z', 'rb') as f:
-        message = f.read()
-    host = HostElement('high_res.jpg')
-    print(host.free_space(4))
-    host.insert_message(message, bits=4, parasite_filename='hue.7z')
+    message = 'hello'.encode('utf-8')
+    host = HostElement('gif.gif')
+    host.insert_message(message, bits=4)
     host.save()
-    host2 = HostElement('_high_res.png')
-    host2.read_message()
