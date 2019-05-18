@@ -14,6 +14,7 @@ Supported host formats:
 * PNG
 * BMP
 * GIF
+* WebP
 * WAV
 
 Images in a different format are automatically converted to PNG. Different audio formats are not supported at all.
@@ -24,17 +25,17 @@ Dependencies:
 * cryptography
 * Pillow (PIL fork)
 ```sh
-$ pip install -r  requirements.txt
+$ pip install -r requirements.txt
 ```
 ***
 How to use:
-* Hide a message:
+* Hide a message or file:
 ```sh
 $ python3 steg.py "Hello World!" image.png
 ```
-* Hide a file:
+* Extract it:
 ```sh
-$ python3 steg.py file.whatever image.png
+$ python3 steg.py _image.png
 ```
 * Encrypt:
 ```sh
@@ -45,10 +46,12 @@ $ python3 steg.py _image.png -p
 Enter password (will not be echoed):
 Hello World!
 ```
+* More options:
+```sh
+$ python3 steg.py -h
+```
 ***
 To do:
 * Add docstrings
 * Allow encoding across multiple files
-* Use a proper header separator for audios
-* Fix first pixel
 * Support JPEG & FLAC as hosts

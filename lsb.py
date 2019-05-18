@@ -27,11 +27,11 @@ class HostElement:
                 gif.append(image)
             gif[0].save(self.filename, save_all=True, append_images = gif[1:], loop=0, duration=self.header[1])
         else:
-            if not self.filename.lower().endswith(('png', 'bmp')):
+            if not self.filename.lower().endswith(('png', 'bmp', 'webp')):
                 print("Host has a lossy format and will be converted to PNG.")
                 self.filename = self.filename[:-3] + 'png'
             image = Image.fromarray(self.data)
-            image.save(self.filename)
+            image.save(self.filename, lossless=True, minimize_size=True, optimize=True)
         print("Information encoded in {}.".format(self.filename))
 
     def insert_message(self, message, bits=2, parasite_filename=None, password=None):
@@ -80,12 +80,15 @@ class HostElement:
         self.free = free
         return free
 
+    def print_free_space(self, bits=2):
+        free = self.free_space(bits)
+        print('File: {}, free: (bytes) {:,}, encoding: 4 bit'.format(self.filename, free, bits))
+
 def get_file(filename):
-    ''' Returns a numpy array of a host file so that one can access values[x][y]. '''
-    if filename.lower().endswith('wav'): # There's a problem with WAV files. Their header has variable length, some of them contain little information, others contain even the lyrics.
-        # Maybe I should drop them, or use something to separate exactly their data and header.
+    ''' Returns data from file in a list with the header and raw data. '''
+    if filename.lower().endswith('wav'):
         content = numpy.fromfile(filename, dtype=numpy.uint8)
-        content = content[:200], content[200:]
+        content = content[:10000], content[10000:]
     elif filename.lower().endswith('gif'):
         image = Image.open(filename)
         frames = []
