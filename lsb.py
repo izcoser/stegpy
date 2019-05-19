@@ -1,4 +1,4 @@
-The solution was to replace all module imports by "from . import module", instead of from module import a, b, c.#!/usr/bin/env python3
+#!/usr/bin/env python3
 # Module for processing images, audios and the least significant bits.
 
 import numpy
