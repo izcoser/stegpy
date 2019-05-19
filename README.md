@@ -24,31 +24,33 @@ Dependencies:
 * numpy
 * cryptography
 * Pillow (PIL fork)
+***
+Install:
 ```sh
-$ pip install -r requirements.txt
+$ pip3 install stegpy
 ```
 ***
 How to use:
 * Hide a message or file:
 ```sh
-$ python3 steg.py "Hello World!" image.png
+$ stegpy "Hello World!" image.png
 ```
 * Extract it:
 ```sh
-$ python3 steg.py _image.png
+$ stegpy _image.png
 ```
 * Encrypt:
 ```sh
-$ python3 steg.py "Hello World!" image.png -p
+$ stegpy "Hello World!" image.png -p
 Enter password (will not be echoed):
 Verify password (will not be echoed):
-$ python3 steg.py _image.png -p
+$ stegpy _image.png -p
 Enter password (will not be echoed):
 Hello World!
 ```
 * More options:
 ```sh
-$ python3 steg.py -h
+$ stegpy -h
 ```
 ***
 To do:
