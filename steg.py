@@ -3,8 +3,9 @@
 import sys
 import argparse
 import os.path
-from lsb import HostElement
 from getpass import getpass
+
+from . import lsb
 
 def main():
     parser = argparse.ArgumentParser(description='Simple steganography program based on the LSB method.')
@@ -20,12 +21,12 @@ def main():
     if args.check:
         for arg in args.a + [args.b]:
             if os.path.isfile(arg):
-                HostElement(arg).print_free_space(bits)
+                lsb.HostElement(arg).print_free_space(bits)
         return
 
     password = filename = None
     host_path = args.b
-    host = HostElement(host_path)
+    host = lsb.HostElement(host_path)
 
     if args.a:
         args.a = args.a[0]
