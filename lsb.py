@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+The solution was to replace all module imports by "from . import module", instead of from module import a, b, c.#!/usr/bin/env python3
 # Module for processing images, audios and the least significant bits.
 
 import numpy
 from PIL import Image
-from crypt import encrypt_info, decrypt_info
+from . import crypt
 
 MAGIC_NUMBER = b'stegv3'
 
@@ -38,7 +38,7 @@ class HostElement:
         raw_message_len = len(message).to_bytes(4, 'big')
         formatted_message = format_message(message, raw_message_len, parasite_filename)
         if password:
-            formatted_message = encrypt_info(password, formatted_message)
+            formatted_message = crypt.encrypt_info(password, formatted_message)
         self.data = encode_message(self.data, formatted_message, bits)
 
     def read_message(self, password=None):
@@ -47,7 +47,7 @@ class HostElement:
         if password:
             try:
                 salt = bytes(msg[:16])
-                msg = decrypt_info(password, bytes(msg[16:]), salt)
+                msg = crypt.decrypt_info(password, bytes(msg[16:]), salt)
             except:
                 print("Wrong password.")
                 return
