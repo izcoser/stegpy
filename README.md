@@ -27,30 +27,30 @@ Dependencies:
 ***
 Install:
 ```sh
-$ pip3 install stegpy
+ pip3 install stegpy
 ```
 ***
 How to use:
 * Hide a message or file:
 ```sh
-$ stegpy "Hello World!" image.png
+ stegpy "Hello World!" image.png
 ```
 * Extract it:
 ```sh
-$ stegpy _image.png
+ stegpy _image.png
 ```
 * Encrypt:
 ```sh
-$ stegpy "Hello World!" image.png -p
+ stegpy "Hello World!" image.png -p
 Enter password (will not be echoed):
 Verify password (will not be echoed):
-$ stegpy _image.png -p
+ stegpy _image.png -p
 Enter password (will not be echoed):
 Hello World!
 ```
 * More options:
 ```sh
-$ stegpy -h
+ stegpy -h
 ```
 ***
 To do:
