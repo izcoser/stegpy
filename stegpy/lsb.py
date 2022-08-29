@@ -3,7 +3,11 @@
 
 import numpy
 from PIL import Image
-from . import crypt
+
+try:
+    from . import crypt
+except:
+    import crypt
 
 MAGIC_NUMBER = b'stegv3'
 
