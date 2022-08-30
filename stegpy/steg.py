@@ -5,7 +5,10 @@ import argparse
 import os.path
 from getpass import getpass
 
-from . import lsb
+try:
+    from . import lsb
+except:
+    import lsb 
 
 def main():
     parser = argparse.ArgumentParser(description='Simple steganography program based on the LSB method.')
