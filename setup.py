@@ -18,10 +18,10 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        'console_scripts': [
-            'stegpy=stegpy.steg:main',
-            ],
-        },
-    python_requires='>=3',
-    install_requires=['numpy', 'cryptography', 'Pillow']
+        "console_scripts": [
+            "stegpy=stegpy.steg:main",
+        ],
+    },
+    python_requires=">=3",
+    install_requires=["numpy", "cryptography", "Pillow"],
 )
