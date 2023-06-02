@@ -30,24 +30,24 @@ Images in a different format are automatically converted to PNG. Different audio
 * Pillow (PIL fork)
 ***
 ## Installation
-```sh
+```console
  pip3 install stegpy
 ```
 ***
 ## Usage:
 ### Hide a message or file:
-```sh
+```console
  stegpy "Hello World!" image.png
 ```
 ### Extract it:
-```sh
+```console
  stegpy _image.png
 ```
 
 Data is encoded without any protection by default, but it can be encrypted with the ```-p``` flag:
 
 ### Encrypt:
-```sh
+```console
  stegpy "Hello World!" image.png -p
 Enter password (will not be echoed):
 Verify password (will not be echoed):
@@ -56,7 +56,7 @@ Enter password (will not be echoed):
 Hello World!
 ```
 ### More options:
-```sh
+```console
  stegpy -h
 ```
 ***
@@ -65,3 +65,7 @@ Hello World!
 * Allow encoding across multiple files
 * Support JPEG & FLAC as hosts
 
+## Contributors
+<a href="https://github.com/dhsdshdhk/stegpy/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dhsdshdhk/stegpy" />
+</a>
