@@ -29,10 +29,27 @@ JPEG hosts use DCT-coefficient embedding. Unsupported image formats are automati
 * numpy
 * cryptography
 * Pillow (PIL fork)
+* jpeglib
 ***
 ## Installation
 ```sh
  pip3 install stegpy
+```
+
+To run from a local checkout instead of installing from PyPI:
+
+```sh
+ git clone https://github.com/dhsdshdhk/stegpy.git
+ cd stegpy
+ uv sync --dev
+ uv run stegpy -h
+```
+
+You can also install the checkout into your current Python environment:
+
+```sh
+ pip install .
+ stegpy -h
 ```
 ***
 ## Usage:
@@ -65,3 +82,10 @@ Hello World!
 * Add docstrings
 * Allow encoding across multiple files
 * Support FLAC as a host
+
+***
+## Support
+
+Donations are appreciated if you find this project useful.
+
+Ethereum / EVM: `0xfE1039ba2d4973eb6F6dd1cF3BDAF24aa6cbff96`
