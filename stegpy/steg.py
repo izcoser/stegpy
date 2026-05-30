@@ -13,7 +13,7 @@ except:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple steganography program based on the LSB method."
+        description="Simple steganography program based on LSB and JPEG DCT methods."
     )
     parser.add_argument(
         "a", help="file or message to encode (if none, will read host)", nargs="*"
@@ -28,7 +28,7 @@ def main():
     parser.add_argument(
         "-b",
         "--bits",
-        help="number of bits per byte (default is 2)",
+        help="number of bits per host byte or JPEG coefficient (default is 2)",
         nargs="?",
         default=2,
         choices=["1", "2", "4"],

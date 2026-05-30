@@ -15,13 +15,14 @@ On the left, a house with a steganographically hidden image. On the right, the e
 
 ***
 ## Supported host formats
+* JPEG
 * PNG
 * BMP
 * GIF
 * WebP
 * WAV
 
-Images in a different format are automatically converted to PNG. Different audio formats are not supported at all.
+JPEG hosts use DCT-coefficient embedding. Unsupported image formats are automatically converted to PNG. Different audio formats are not supported at all.
 
 ***
 ## Dependencies
@@ -63,5 +64,4 @@ Hello World!
 ## To do
 * Add docstrings
 * Allow encoding across multiple files
-* Support JPEG & FLAC as hosts
-
+* Support FLAC as a host

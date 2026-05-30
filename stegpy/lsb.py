@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Module for processing images, audios and the least significant bits.
 
+import os.path
+
+import jpeglib
 import numpy
 from PIL import Image
 
@@ -10,6 +13,86 @@ except:
     import crypt
 
 MAGIC_NUMBER = b"stegv3"
+JPEG_FORMATS = {"jpg", "jpeg"}
+JPEG_BITS_TO_CODE = {1: 0, 2: 1, 4: 2}
+JPEG_CODE_TO_BITS = {code: bits for bits, code in JPEG_BITS_TO_CODE.items()}
+JPEG_ZIGZAG_ORDER = [
+    (0, 0),
+    (0, 1),
+    (1, 0),
+    (2, 0),
+    (1, 1),
+    (0, 2),
+    (0, 3),
+    (1, 2),
+    (2, 1),
+    (3, 0),
+    (4, 0),
+    (3, 1),
+    (2, 2),
+    (1, 3),
+    (0, 4),
+    (0, 5),
+    (1, 4),
+    (2, 3),
+    (3, 2),
+    (4, 1),
+    (5, 0),
+    (6, 0),
+    (5, 1),
+    (4, 2),
+    (3, 3),
+    (2, 4),
+    (1, 5),
+    (0, 6),
+    (0, 7),
+    (1, 6),
+    (2, 5),
+    (3, 4),
+    (4, 3),
+    (5, 2),
+    (6, 1),
+    (7, 0),
+    (7, 1),
+    (6, 2),
+    (5, 3),
+    (4, 4),
+    (3, 5),
+    (2, 6),
+    (1, 7),
+    (2, 7),
+    (3, 6),
+    (4, 5),
+    (5, 4),
+    (6, 3),
+    (7, 2),
+    (7, 3),
+    (6, 4),
+    (5, 5),
+    (4, 6),
+    (3, 7),
+    (4, 7),
+    (5, 6),
+    (6, 5),
+    (7, 4),
+    (7, 5),
+    (6, 6),
+    (5, 7),
+    (6, 7),
+    (7, 6),
+    (7, 7),
+]
+JPEG_ZIGZAG_OFFSETS = numpy.asarray(
+    [row * 8 + col for row, col in JPEG_ZIGZAG_ORDER[1:]], dtype=numpy.int64
+)
+
+
+def get_format(filename):
+    return os.path.splitext(filename)[1].lower().lstrip(".")
+
+
+def is_jpeg_format(file_format):
+    return file_format in JPEG_FORMATS
 
 
 class HostElement:
@@ -17,7 +100,7 @@ class HostElement:
 
     def __init__(self, filename):
         self.filename = filename
-        self.format = filename[-3:]
+        self.format = get_format(filename)
         self.header, self.data = get_file(filename)
 
     def save(self):
@@ -28,20 +111,22 @@ class HostElement:
         elif self.format.lower() == "gif":
             gif = []
             for frame, palette in zip(self.data, self.header[0]):
-                image = Image.fromarray(frame)
+                image = Image.fromarray(frame, mode="P")
                 image.putpalette(palette)
                 gif.append(image)
             gif[0].save(
                 self.filename,
-                save_all=True,
+                save_all=len(gif) > 1,
                 append_images=gif[1:],
                 loop=0,
                 duration=self.header[1],
             )
+        elif is_jpeg_format(self.format):
+            self.header.write_dct(self.filename)
         else:
             if not self.filename.lower().endswith(("png", "bmp", "webp")):
                 print("Host has a lossy format and will be converted to PNG.")
-                self.filename = self.filename[:-3] + "png"
+                self.filename = os.path.splitext(self.filename)[0] + ".png"
             image = Image.fromarray(self.data)
             image.save(self.filename, lossless=True, minimize_size=True, optimize=True)
         print("Information encoded in {}.".format(self.filename))
@@ -51,10 +136,16 @@ class HostElement:
         formatted_message = format_message(message, raw_message_len, parasite_filename)
         if password:
             formatted_message = crypt.encrypt_info(password, formatted_message)
-        self.data = encode_message(self.data, formatted_message, bits)
+        if is_jpeg_format(self.format):
+            self.data = encode_jpeg_message(self.data, formatted_message, bits)
+        else:
+            self.data = encode_message(self.data, formatted_message, bits)
 
     def read_message(self, password=None):
-        msg = decode_message(self.data)
+        if is_jpeg_format(self.format):
+            msg = decode_jpeg_message(self.data)
+        else:
+            msg = decode_message(self.data)
 
         if password:
             try:
@@ -85,6 +176,10 @@ class HostElement:
         print("File {} succesfully extracted from {}".format(filename, self.filename))
 
     def free_space(self, bits=2):
+        if is_jpeg_format(self.format):
+            self.free = jpeg_free_space(self.data, bits)
+            return self.free
+
         shape = self.data.shape
         self.data.shape = -1
         free = self.data.size * bits // 8
@@ -118,12 +213,153 @@ def get_file(filename):
         except EOFError:
             pass
         content = [palettes, image.info["duration"]], numpy.asarray(frames)
+    elif is_jpeg_format(get_format(filename)):
+        jpeg = jpeglib.read_dct(filename)
+        content = jpeg, get_jpeg_channels(jpeg)
     else:
         image = Image.open(filename)
         if image.mode != "RGB":
             image = image.convert("RGB")
         content = None, numpy.array(image)
     return content
+
+
+def get_jpeg_channels(jpeg):
+    channels = [jpeg.Y]
+    if getattr(jpeg, "Cb", None) is not None and getattr(jpeg, "Cr", None) is not None:
+        channels.extend([jpeg.Cb, jpeg.Cr])
+    return channels
+
+
+def get_jpeg_carrier_sets(channels):
+    carrier_sets = []
+    total_carriers = 0
+
+    for channel in channels:
+        flat = channel.reshape(-1)
+        block_count = channel.shape[0] * channel.shape[1]
+        block_bases = (numpy.arange(block_count, dtype=numpy.int64) * 64).reshape(-1, 1)
+        indices = (block_bases + JPEG_ZIGZAG_OFFSETS).reshape(-1)
+        carrier_sets.append((flat, indices))
+        total_carriers += len(indices)
+
+    return carrier_sets, total_carriers
+
+
+def set_jpeg_carrier_value(coeff, value, bits):
+    coeff = int(coeff)
+    value = int(value)
+    modulus = 2**bits
+    sign = -1 if coeff < 0 else 1
+    abs_coeff = abs(coeff)
+
+    if abs_coeff == 0 and value == 0:
+        return 0
+
+    if abs_coeff >= value:
+        lower = abs_coeff - ((abs_coeff - value) % modulus)
+    else:
+        lower = value
+
+    upper = lower + modulus
+    candidates = [lower, upper]
+
+    if value != 0:
+        candidates = [
+            candidate if candidate != 0 else candidate + modulus
+            for candidate in candidates
+        ]
+
+    target = min(
+        candidates, key=lambda candidate: (abs(candidate - abs_coeff), candidate)
+    )
+
+    if target == 0:
+        return 0
+
+    return sign * target
+
+
+def encode_jpeg_message(channels, message, bits):
+    """Encodes a byte array in JPEG DCT coefficients."""
+    carrier_sets, total_carriers = get_jpeg_carrier_sets(channels)
+    total_coefficients = sum(channel.size for channel in channels)
+    max_message_len = max(0, (total_carriers - 1) * bits // 8)
+
+    print("Host dimension: {:,} DCT coefficients".format(total_coefficients))
+    print("Message size: {:,} bytes".format(len(message)))
+    print("Maximum size: {:,} bytes".format(max_message_len))
+
+    check_message_space(max_message_len, len(message))
+
+    first_flat, first_indices = carrier_sets[0]
+    first_flat[first_indices[0]] = set_jpeg_carrier_value(
+        first_flat[first_indices[0]], JPEG_BITS_TO_CODE[bits], 2
+    )
+
+    chunk_mask = 2**bits - 1
+    divisor = 8 // bits
+    payload_chunks = []
+
+    for byte in message:
+        for offset in range(divisor):
+            payload_chunks.append(byte >> bits * offset & chunk_mask)
+
+    chunk_index = 0
+    metadata_written = False
+
+    for flat, indices in carrier_sets:
+        start = 1 if not metadata_written else 0
+        metadata_written = True
+
+        for index in indices[start:]:
+            if chunk_index >= len(payload_chunks):
+                return channels
+
+            flat[index] = set_jpeg_carrier_value(
+                flat[index], payload_chunks[chunk_index], bits
+            )
+            chunk_index += 1
+
+    return channels
+
+
+def decode_jpeg_message(channels):
+    """Decodes JPEG DCT coefficients into a byte array."""
+    carrier_sets, total_carriers = get_jpeg_carrier_sets(channels)
+    if total_carriers == 0:
+        return numpy.zeros(0, dtype=numpy.uint8)
+
+    first_flat, first_indices = carrier_sets[0]
+    bits_code = abs(int(first_flat[first_indices[0]])) & 3
+    bits = JPEG_CODE_TO_BITS.get(bits_code, 2)
+    chunk_mask = 2**bits - 1
+    divisor = 8 // bits
+    chunks = []
+    metadata_read = False
+
+    for flat, indices in carrier_sets:
+        start = 1 if not metadata_read else 0
+        metadata_read = True
+        coeffs = numpy.abs(flat[indices[start:]].astype(numpy.int32))
+        chunks.append((coeffs & chunk_mask).astype(numpy.uint8))
+
+    payload_chunks = (
+        numpy.concatenate(chunks) if chunks else numpy.zeros(0, dtype=numpy.uint8)
+    )
+    usable_chunks = len(payload_chunks) - (len(payload_chunks) % divisor)
+    payload_chunks = payload_chunks[:usable_chunks]
+    msg = numpy.zeros(len(payload_chunks) // divisor, dtype=numpy.uint8)
+
+    for i in range(divisor):
+        msg |= payload_chunks[i::divisor] << bits * i
+
+    return msg
+
+
+def jpeg_free_space(channels, bits=2):
+    _, total_carriers = get_jpeg_carrier_sets(channels)
+    return max(0, (total_carriers - 1) * bits // 8)
 
 
 def format_message(message, msg_len, filename=None):
@@ -191,7 +427,7 @@ def check_message_space(max_message_len, message_len):
 def decode_message(host_data):
     """Decodes the image numpy array into a byte array."""
     host_data.shape = (-1,)  # convert to 1D
-    bits = 2 ** ((host_data[0] & 48) >> 4)  # bits = 2 ^ (5th and 6th bits)
+    bits = 2 ** int((host_data[0] & 48) >> 4)  # bits = 2 ^ (5th and 6th bits)
     divisor = 8 // bits
 
     if host_data.size % divisor != 0:
