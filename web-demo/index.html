@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>stegpy PNG demo</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">stegpy web demo</p>
+          <h1>Hide text inside a PNG, entirely in your browser.</h1>
+        </div>
+        <p>
+          This demo supports PNG text payloads only. JPEG, GIF, WebP, WAV,
+          encrypted payloads, and embedded files are available in the Python
+          package.
+          <a href="https://github.com/izcoser/stegpy">View the repository</a>.
+        </p>
+      </section>
+
+      <section class="tool-grid">
+        <div class="workspace">
+          <div class="tabs" role="tablist" aria-label="Demo mode">
+            <button class="tab is-active" id="encode-tab" type="button" role="tab" aria-selected="true" aria-controls="encode-panel">
+              Encode
+            </button>
+            <button class="tab" id="decode-tab" type="button" role="tab" aria-selected="false" aria-controls="decode-panel">
+              Decode
+            </button>
+          </div>
+
+          <div class="drop-zone" id="drop-zone">
+            <input id="image-input" type="file" accept="image/png">
+            <div>
+              <strong>Choose a PNG</strong>
+              <span>or drop one here</span>
+            </div>
+          </div>
+
+          <div class="preview-wrap">
+            <canvas id="preview-canvas" width="960" height="540" aria-label="Selected PNG preview"></canvas>
+          </div>
+        </div>
+
+        <div class="controls">
+          <section class="panel is-active" id="encode-panel" role="tabpanel" aria-labelledby="encode-tab">
+            <label for="message-input">Message</label>
+            <textarea id="message-input" rows="8" placeholder="Text to hide"></textarea>
+
+            <label for="bits-input">LSB depth</label>
+            <select id="bits-input">
+              <option value="1">1 bit</option>
+              <option value="2" selected>2 bits</option>
+              <option value="4">4 bits</option>
+            </select>
+
+            <dl class="stats">
+              <div>
+                <dt>Capacity</dt>
+                <dd id="capacity-output">No image</dd>
+              </div>
+              <div>
+                <dt>Payload</dt>
+                <dd id="payload-output">0 bytes</dd>
+              </div>
+            </dl>
+
+            <button class="primary" id="encode-button" type="button" disabled>Encode and download PNG</button>
+          </section>
+
+          <section class="panel" id="decode-panel" role="tabpanel" aria-labelledby="decode-tab" hidden>
+            <p class="panel-note">Select a PNG produced by this demo or by stegpy's unencrypted PNG LSB path.</p>
+
+            <button class="primary" id="decode-button" type="button" disabled>Decode message</button>
+
+            <label for="decoded-output">Decoded text</label>
+            <textarea id="decoded-output" rows="10" readonly placeholder="Decoded text will appear here"></textarea>
+          </section>
+
+          <p class="status" id="status-output" role="status">Select a PNG to begin.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

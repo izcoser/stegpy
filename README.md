@@ -77,6 +77,17 @@ Hello World!
 ```sh
  stegpy -h
 ```
+
+***
+## Browser demo
+
+A small client-side demo is available at
+https://izcoser.github.io/stegpy/.
+
+You can also run it locally by opening `web-demo/index.html`.
+
+It runs entirely in the browser and supports PNG text payloads only. For JPEG,
+GIF, WebP, WAV, encrypted payloads, and embedded files, use the Python package.
 ***
 ## To do
 * Add docstrings
