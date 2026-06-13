@@ -81,8 +81,8 @@ Hello World!
 ***
 ## Live demo
 
-A live demo backed by the Python package is deployed, but its public endpoint is
-not published in this repository yet.
+A live demo backed by the Python package is available at
+<https://stegpy.coseri.xyz>.
 
 You can also run it locally by opening `web-demo/index.html`.
 
