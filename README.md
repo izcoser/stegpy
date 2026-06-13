@@ -81,8 +81,8 @@ Hello World!
 ***
 ## Live demo
 
-A live demo backed by the Python package is available at
-<http://[2a01:4f8:c015:b7ee::1]/>.
+A live demo backed by the Python package is deployed, but its public endpoint is
+not published in this repository yet.
 
 You can also run it locally by opening `web-demo/index.html`.
 
