@@ -179,8 +179,7 @@ h2 {
   align-items: start;
 }
 
-.card,
-.status-card {
+.card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
@@ -449,8 +448,11 @@ dd {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 18px;
-  padding: 13px 15px;
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card-soft);
 }
 
 .status-dot {
@@ -468,6 +470,24 @@ dd {
 
 .status.is-success {
   color: var(--success);
+}
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 18px 2px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.site-footer a {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
 }
 
 @media (max-width: 920px) {
@@ -520,5 +540,11 @@ dd {
 
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  .site-footer {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
   }
 }

@@ -87,9 +87,7 @@ A live demo backed by the Python package is available at
 You can also run it locally by opening `web-demo/index.html`.
 
 The hosted demo supports PNG, BMP, GIF, WebP, WAV, and JPEG hosts, text or file
-payloads, and optional password encryption. The old GitHub Pages demo was a
-client-side JavaScript clone; the live demo runs the real stegpy Python code on
-the backend.
+payloads, and optional password encryption.
 ***
 ## To do
 * Add docstrings

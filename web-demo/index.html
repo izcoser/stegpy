@@ -145,13 +145,20 @@
             <label for="decoded-output">Decoded text</label>
             <textarea id="decoded-output" rows="10" readonly placeholder="Decoded text will appear here"></textarea>
           </section>
+
+          <aside class="status-card" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <p class="status" id="status-output" role="status">Select a host file to begin.</p>
+          </aside>
         </article>
       </section>
 
-      <aside class="status-card" aria-live="polite">
-        <span class="status-dot" aria-hidden="true"></span>
-        <p class="status" id="status-output" role="status">Select a host file to begin.</p>
-      </aside>
+      <footer class="site-footer">
+        <span>Donations are appreciated if you find stegpy useful.</span>
+        <a href="https://etherscan.io/address/0xfE1039ba2d4973eb6F6dd1cF3BDAF24aa6cbff96">
+          Ethereum / EVM: 0xfE1039ba2d4973eb6F6dd1cF3BDAF24aa6cbff96
+        </a>
+      </footer>
     </main>
 
     <script src="app.js"></script>
