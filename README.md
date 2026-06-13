@@ -79,15 +79,17 @@ Hello World!
 ```
 
 ***
-## Browser demo
+## Live demo
 
-A small client-side demo is available at
-https://izcoser.github.io/stegpy/.
+A live demo backed by the Python package is available at
+<http://[2a01:4f8:c015:b7ee::1]/>.
 
 You can also run it locally by opening `web-demo/index.html`.
 
-It runs entirely in the browser and supports PNG text payloads only. For JPEG,
-GIF, WebP, WAV, encrypted payloads, and embedded files, use the Python package.
+The hosted demo supports PNG, BMP, GIF, WebP, WAV, and JPEG hosts, text or file
+payloads, and optional password encryption. The old GitHub Pages demo was a
+client-side JavaScript clone; the live demo runs the real stegpy Python code on
+the backend.
 ***
 ## To do
 * Add docstrings

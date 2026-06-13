@@ -1,160 +1,90 @@
 "use strict";
 
-const MAGIC = new Uint8Array([115, 116, 101, 103, 118, 51]);
+const SUPPORTED_HOSTS = new Set(["png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"]);
 const HEADER_SIZE = 11;
-const BITS_TO_MARKER = new Map([
-  [1, 0],
-  [2, 16],
-  [4, 32],
-]);
-const MARKER_TO_BITS = new Map([
-  [0, 1],
-  [1, 2],
-  [2, 4],
-]);
 
-function rgbCarrierCount(imageData) {
-  return (imageData.data.length / 4) * 3;
+function extensionFor(file) {
+  return (file?.name.split(".").pop() || "").toLowerCase();
 }
 
-function capacityBytes(imageData, bits) {
-  return Math.floor(rgbCarrierCount(imageData) / (8 / bits));
+function isImageHost(file) {
+  return ["png", "bmp", "gif", "webp", "jpg", "jpeg"].includes(extensionFor(file));
 }
 
-function formatTextPayload(text) {
-  const body = new TextEncoder().encode(text);
-  if (body.length > 0xffffffff) {
-    throw new Error("Message is too large.");
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) {
+    return "unknown";
   }
 
-  const payload = new Uint8Array(HEADER_SIZE + body.length);
-  payload.set(MAGIC, 0);
-  payload[6] = (body.length >>> 24) & 0xff;
-  payload[7] = (body.length >>> 16) & 0xff;
-  payload[8] = (body.length >>> 8) & 0xff;
-  payload[9] = body.length & 0xff;
-  payload[10] = 0;
-  payload.set(body, HEADER_SIZE);
-  return payload;
-}
-
-function isAlphaOffset(offset) {
-  return offset % 4 === 3;
-}
-
-function nextRgbOffset(offset, dataLength) {
-  while (offset < dataLength && isAlphaOffset(offset)) {
-    offset += 1;
+  const units = ["bytes", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
   }
-  return offset;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: unitIndex ? 1 : 0 })} ${units[unitIndex]}`;
 }
 
-function encodeTextIntoImageData(sourceImageData, text, bits) {
-  const payload = formatTextPayload(text);
-  const maxBytes = capacityBytes(sourceImageData, bits);
-  if (payload.length > maxBytes) {
-    throw new Error(`Message needs ${payload.length} bytes, but this PNG can hold ${maxBytes} bytes at ${bits} bit.`);
+function payloadEstimate(mode, text, file) {
+  if (mode === "file") {
+    return HEADER_SIZE + (file?.name.length || 0) + (file?.size || 0);
   }
+  return HEADER_SIZE + new TextEncoder().encode(text).length;
+}
 
-  const encoded = new ImageData(
-    new Uint8ClampedArray(sourceImageData.data),
-    sourceImageData.width,
-    sourceImageData.height
-  );
-  const data = encoded.data;
-  const mask = (1 << bits) - 1;
-  const clearMask = 256 - (1 << bits);
-  const chunksPerByte = 8 / bits;
-  let offset = 0;
+async function postForm(url, formData) {
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+  });
 
-  for (const byte of payload) {
-    for (let chunk = 0; chunk < chunksPerByte; chunk += 1) {
-      offset = nextRgbOffset(offset, data.length);
-      data[offset] = (data[offset] & clearMask) | ((byte >> (bits * chunk)) & mask);
-      offset += 1;
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const error = await response.json();
+      message = error.detail || message;
+    } catch {
+      message = await response.text() || message;
     }
+    throw new Error(message);
   }
 
-  data[0] = (data[0] & 207) | BITS_TO_MARKER.get(bits);
-  return encoded;
+  return response;
 }
 
-function decodeBytesFromImageData(imageData) {
-  const data = imageData.data;
-  const marker = (data[0] & 48) >> 4;
-  const bits = MARKER_TO_BITS.get(marker) || 2;
-  const mask = (1 << bits) - 1;
-  const chunksPerByte = 8 / bits;
-  const maxBytes = capacityBytes(imageData, bits);
-  const bytes = new Uint8Array(maxBytes);
-  let offset = 0;
-
-  for (let byteIndex = 0; byteIndex < maxBytes; byteIndex += 1) {
-    let byte = 0;
-
-    for (let chunk = 0; chunk < chunksPerByte; chunk += 1) {
-      offset = nextRgbOffset(offset, data.length);
-      byte |= (data[offset] & mask) << (bits * chunk);
-      offset += 1;
-    }
-
-    bytes[byteIndex] = byte;
-  }
-
-  return { bytes, bits };
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
-function decodeTextFromImageData(imageData) {
-  const { bytes, bits } = decodeBytesFromImageData(imageData);
-  for (let index = 0; index < MAGIC.length; index += 1) {
-    if (bytes[index] !== MAGIC[index]) {
-      throw new Error("No stegpy text payload was found in this PNG.");
-    }
-  }
-
-  const filenameLength = bytes[10];
-  if (filenameLength !== 0) {
-    throw new Error("This payload contains an embedded file. Use the Python package to extract it.");
-  }
-
-  const messageLength =
-    bytes[6] * 0x1000000 +
-    (bytes[7] << 16) +
-    (bytes[8] << 8) +
-    bytes[9];
-  const start = HEADER_SIZE;
-  const end = start + messageLength;
-  if (end > bytes.length) {
-    throw new Error(`The payload header says ${messageLength} bytes, but the PNG only has ${bytes.length - HEADER_SIZE} readable bytes at ${bits} bit.`);
-  }
-
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes.slice(start, end));
-}
-
-function downloadCanvasPng(canvas, filename, onError) {
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      onError("Could not create a PNG download.");
-      return;
-    }
-
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }, "image/png");
+function filenameFromDisposition(disposition, fallback) {
+  const match = /filename="?([^"]+)"?/i.exec(disposition || "");
+  return match ? match[1] : fallback;
 }
 
 function setupDemo() {
-  const imageInput = document.getElementById("image-input");
+  const hostInput = document.getElementById("host-input");
   const dropZone = document.getElementById("drop-zone");
   const canvas = document.getElementById("preview-canvas");
   const context = canvas.getContext("2d", { willReadFrequently: true });
+  const filePreview = document.getElementById("file-preview");
+  const filePreviewName = document.getElementById("file-preview-name");
+  const filePreviewMeta = document.getElementById("file-preview-meta");
+  const payloadModeInput = document.getElementById("payload-mode-input");
+  const messageField = document.getElementById("message-field");
+  const payloadField = document.getElementById("payload-field");
   const messageInput = document.getElementById("message-input");
+  const payloadInput = document.getElementById("payload-input");
   const bitsInput = document.getElementById("bits-input");
   const capacityOutput = document.getElementById("capacity-output");
   const payloadOutput = document.getElementById("payload-output");
+  const encodePasswordInput = document.getElementById("encode-password-input");
+  const decodePasswordInput = document.getElementById("decode-password-input");
   const encodeButton = document.getElementById("encode-button");
   const decodeButton = document.getElementById("decode-button");
   const decodedOutput = document.getElementById("decoded-output");
@@ -163,8 +93,8 @@ function setupDemo() {
   const decodeTab = document.getElementById("decode-tab");
   const encodePanel = document.getElementById("encode-panel");
   const decodePanel = document.getElementById("decode-panel");
-  let currentImageData = null;
-  let currentFilename = "encoded.png";
+  let currentHost = null;
+  let capacityRequestId = 0;
 
   function setStatus(message, isError = false, isSuccess = false) {
     statusOutput.textContent = message;
@@ -176,53 +106,103 @@ function setupDemo() {
     return Number.parseInt(bitsInput.value, 10);
   }
 
-  function updateStats() {
-    const payloadSize = formatTextPayload(messageInput.value).length;
-    payloadOutput.textContent = `${payloadSize.toLocaleString()} bytes`;
-
-    if (!currentImageData) {
-      capacityOutput.textContent = "No image";
-      encodeButton.disabled = true;
-      decodeButton.disabled = true;
-      return;
-    }
-
-    const capacity = capacityBytes(currentImageData, selectedBits());
-    capacityOutput.textContent = `${capacity.toLocaleString()} bytes`;
-    encodeButton.disabled = payloadSize > capacity;
-    decodeButton.disabled = false;
+  function selectedMode() {
+    return payloadModeInput.value;
   }
 
-  function drawImageToCanvas(image) {
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  function updatePayloadMode() {
+    const fileMode = selectedMode() === "file";
+    messageField.hidden = fileMode;
+    payloadField.hidden = !fileMode;
     updateStats();
   }
 
-  function loadPng(file) {
-    if (!file || file.type !== "image/png") {
-      setStatus("Choose a PNG file.", true);
+  function updateStats() {
+    const estimate = payloadEstimate(selectedMode(), messageInput.value, payloadInput.files[0]);
+    payloadOutput.textContent = formatBytes(estimate);
+    encodeButton.disabled = !currentHost;
+    decodeButton.disabled = !currentHost;
+
+    if (!currentHost) {
+      capacityOutput.textContent = "No host";
+    }
+  }
+
+  async function refreshCapacity() {
+    updateStats();
+    if (!currentHost) {
       return;
     }
 
-    currentFilename = file.name.replace(/\.png$/i, "") || "encoded";
+    const requestId = ++capacityRequestId;
+    const formData = new FormData();
+    formData.append("host", currentHost);
+    formData.append("bits", String(selectedBits()));
+    capacityOutput.textContent = "Checking...";
+
+    try {
+      const response = await postForm("/api/capacity", formData);
+      const data = await response.json();
+      if (requestId === capacityRequestId) {
+        capacityOutput.textContent = formatBytes(data.capacityBytes);
+      }
+    } catch (error) {
+      if (requestId === capacityRequestId) {
+        capacityOutput.textContent = "Unavailable";
+        setStatus(error.message, true);
+      }
+    }
+  }
+
+  function showFilePreview(file) {
+    canvas.hidden = true;
+    filePreview.hidden = false;
+    filePreviewName.textContent = file.name;
+    filePreviewMeta.textContent = `${extensionFor(file).toUpperCase()} host, ${formatBytes(file.size)}`;
+  }
+
+  function drawImagePreview(file) {
     const image = new Image();
     const url = URL.createObjectURL(file);
 
     image.addEventListener("load", () => {
       URL.revokeObjectURL(url);
-      drawImageToCanvas(image);
-      decodedOutput.value = "";
-      setStatus(`Loaded ${file.name}.`, false, true);
+      canvas.hidden = false;
+      filePreview.hidden = true;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
     });
+
     image.addEventListener("error", () => {
       URL.revokeObjectURL(url);
-      setStatus("The selected PNG could not be loaded.", true);
+      showFilePreview(file);
     });
+
     image.src = url;
+  }
+
+  function loadHost(file) {
+    if (!file) {
+      return;
+    }
+
+    const extension = extensionFor(file);
+    if (!SUPPORTED_HOSTS.has(extension)) {
+      setStatus("Choose a PNG, BMP, GIF, WebP, WAV, JPG, or JPEG host file.", true);
+      return;
+    }
+
+    currentHost = file;
+    decodedOutput.value = "";
+    if (isImageHost(file)) {
+      drawImagePreview(file);
+    } else {
+      showFilePreview(file);
+    }
+    setStatus(`Loaded ${file.name}.`, false, true);
+    refreshCapacity();
   }
 
   function switchMode(mode) {
@@ -237,9 +217,11 @@ function setupDemo() {
     decodePanel.hidden = isEncode;
   }
 
-  imageInput.addEventListener("change", () => loadPng(imageInput.files[0]));
+  hostInput.addEventListener("change", () => loadHost(hostInput.files[0]));
+  payloadModeInput.addEventListener("change", updatePayloadMode);
   messageInput.addEventListener("input", updateStats);
-  bitsInput.addEventListener("change", updateStats);
+  payloadInput.addEventListener("change", updateStats);
+  bitsInput.addEventListener("change", refreshCapacity);
   encodeTab.addEventListener("click", () => switchMode("encode"));
   decodeTab.addEventListener("click", () => switchMode("decode"));
 
@@ -251,45 +233,86 @@ function setupDemo() {
   dropZone.addEventListener("drop", (event) => {
     event.preventDefault();
     dropZone.classList.remove("is-dragging");
-    loadPng(event.dataTransfer.files[0]);
+    loadHost(event.dataTransfer.files[0]);
   });
 
-  encodeButton.addEventListener("click", () => {
+  encodeButton.addEventListener("click", async () => {
     try {
-      const encoded = encodeTextIntoImageData(currentImageData, messageInput.value, selectedBits());
-      context.putImageData(encoded, 0, 0);
-      currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      downloadCanvasPng(canvas, `_${currentFilename}.png`, (message) => setStatus(message, true));
-      setStatus("Encoded PNG is ready for download.", false, true);
+      if (!currentHost) {
+        throw new Error("Choose a host file first.");
+      }
+      if (selectedMode() === "file" && !payloadInput.files[0]) {
+        throw new Error("Choose a payload file.");
+      }
+
+      encodeButton.disabled = true;
+      setStatus("Encoding with stegpy...");
+
+      const formData = new FormData();
+      formData.append("host", currentHost);
+      formData.append("mode", selectedMode());
+      formData.append("message", messageInput.value);
+      formData.append("bits", String(selectedBits()));
+      formData.append("password", encodePasswordInput.value);
+      if (selectedMode() === "file") {
+        formData.append("payload", payloadInput.files[0]);
+      }
+
+      const response = await postForm("/api/encode", formData);
+      const blob = await response.blob();
+      const filename = filenameFromDisposition(
+        response.headers.get("content-disposition"),
+        `_${currentHost.name}`
+      );
+      downloadBlob(blob, filename);
+      setStatus(`Encoded ${filename}.`, false, true);
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
       updateStats();
-    } catch (error) {
-      setStatus(error.message, true);
     }
   });
 
-  decodeButton.addEventListener("click", () => {
+  decodeButton.addEventListener("click", async () => {
     try {
-      decodedOutput.value = decodeTextFromImageData(currentImageData);
-      setStatus("Decoded text payload.", false, true);
-    } catch (error) {
+      if (!currentHost) {
+        throw new Error("Choose a host file first.");
+      }
+
+      decodeButton.disabled = true;
       decodedOutput.value = "";
+      setStatus("Decoding with stegpy...");
+
+      const formData = new FormData();
+      formData.append("host", currentHost);
+      formData.append("password", decodePasswordInput.value);
+
+      const response = await postForm("/api/decode", formData);
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        decodedOutput.value = data.message;
+        setStatus("Decoded text payload.", false, true);
+      } else {
+        const blob = await response.blob();
+        const filename = filenameFromDisposition(
+          response.headers.get("content-disposition"),
+          "payload.bin"
+        );
+        downloadBlob(blob, filename);
+        setStatus(`Decoded embedded file ${filename}.`, false, true);
+      }
+    } catch (error) {
       setStatus(error.message, true);
+    } finally {
+      updateStats();
     }
   });
 
+  updatePayloadMode();
   updateStats();
 }
 
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", setupDemo);
-}
-
-if (typeof module !== "undefined") {
-  module.exports = {
-    capacityBytes,
-    decodeTextFromImageData,
-    encodeTextIntoImageData,
-    formatTextPayload,
-    rgbCarrierCount,
-  };
 }

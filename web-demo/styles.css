@@ -185,6 +185,30 @@ canvas {
   image-rendering: auto;
 }
 
+canvas[hidden] {
+  display: none;
+}
+
+.file-preview {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.file-preview[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.file-preview strong {
+  font-size: 1.25rem;
+}
+
+.file-preview span {
+  color: var(--muted);
+}
+
 .panel {
   display: grid;
   gap: 12px;
@@ -200,6 +224,8 @@ label {
 }
 
 textarea,
+input[type="password"],
+input[type="file"],
 select {
   width: 100%;
   border: 1px solid var(--line);
@@ -220,7 +246,15 @@ select {
   padding: 0 12px;
 }
 
+input[type="password"],
+input[type="file"] {
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
 textarea:focus,
+input[type="password"]:focus,
+input[type="file"]:focus,
 select:focus,
 button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent);

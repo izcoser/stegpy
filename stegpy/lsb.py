@@ -149,8 +149,7 @@ class HostElement:
 
         if password:
             try:
-                salt = bytes(msg[:16])
-                msg = crypt.decrypt_info(password, bytes(msg[16:]), salt)
+                msg = crypt.decrypt_embedded_info(password, msg)
             except:
                 print("Wrong password.")
                 return

@@ -3,20 +3,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>stegpy PNG demo</title>
+    <title>stegpy live demo</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="app-shell">
       <section class="intro">
         <div>
-          <p class="eyebrow">stegpy web demo</p>
-          <h1>Hide text inside a PNG, entirely in your browser.</h1>
+          <p class="eyebrow">stegpy live demo</p>
+          <h1>Hide text or files with the real Python package.</h1>
         </div>
         <p>
-          This demo supports PNG text payloads only. JPEG, GIF, WebP, WAV,
-          encrypted payloads, and embedded files are available in the Python
-          package.
+          This demo runs stegpy on a tiny Ubuntu server. It supports PNG, BMP,
+          GIF, WebP, WAV, and JPEG hosts, with optional password encryption.
           <a href="https://github.com/izcoser/stegpy">View the repository</a>.
         </p>
       </section>
@@ -33,22 +32,39 @@
           </div>
 
           <div class="drop-zone" id="drop-zone">
-            <input id="image-input" type="file" accept="image/png">
+            <input id="host-input" type="file" accept=".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave">
             <div>
-              <strong>Choose a PNG</strong>
+              <strong>Choose a host file</strong>
               <span>or drop one here</span>
             </div>
           </div>
 
           <div class="preview-wrap">
-            <canvas id="preview-canvas" width="960" height="540" aria-label="Selected PNG preview"></canvas>
+            <canvas id="preview-canvas" width="960" height="540" aria-label="Selected image preview"></canvas>
+            <div class="file-preview" id="file-preview" hidden>
+              <strong id="file-preview-name">No file selected</strong>
+              <span id="file-preview-meta"></span>
+            </div>
           </div>
         </div>
 
         <div class="controls">
           <section class="panel is-active" id="encode-panel" role="tabpanel" aria-labelledby="encode-tab">
+            <label for="payload-mode-input">Payload type</label>
+            <select id="payload-mode-input">
+              <option value="text" selected>Text message</option>
+              <option value="file">File upload</option>
+            </select>
+
+            <div id="message-field">
             <label for="message-input">Message</label>
             <textarea id="message-input" rows="8" placeholder="Text to hide"></textarea>
+            </div>
+
+            <div id="payload-field" hidden>
+              <label for="payload-input">Payload file</label>
+              <input id="payload-input" type="file">
+            </div>
 
             <label for="bits-input">LSB depth</label>
             <select id="bits-input">
@@ -68,11 +84,17 @@
               </div>
             </dl>
 
-            <button class="primary" id="encode-button" type="button" disabled>Encode and download PNG</button>
+            <label for="encode-password-input">Password (optional)</label>
+            <input id="encode-password-input" type="password" autocomplete="off" placeholder="Encrypt payload">
+
+            <button class="primary" id="encode-button" type="button" disabled>Encode and download result</button>
           </section>
 
           <section class="panel" id="decode-panel" role="tabpanel" aria-labelledby="decode-tab" hidden>
-            <p class="panel-note">Select a PNG produced by this demo or by stegpy's unencrypted PNG LSB path.</p>
+            <p class="panel-note">Select a host file produced by stegpy. Text payloads are shown here; embedded files download automatically.</p>
+
+            <label for="decode-password-input">Password (if encrypted)</label>
+            <input id="decode-password-input" type="password" autocomplete="off" placeholder="Decrypt payload">
 
             <button class="primary" id="decode-button" type="button" disabled>Decode message</button>
 

@@ -13,3 +13,10 @@ def test_encrypt_info_uses_random_salt():
     second = crypt.encrypt_info("hunter2", b"hidden message")
 
     assert first != second
+
+
+def test_decrypt_embedded_info_ignores_decoded_host_trailing_bytes():
+    token = crypt.encrypt_info("hunter2", b"hidden message")
+    decoded_host_bytes = token + b"\x00\xffnot part of the token"
+
+    assert crypt.decrypt_embedded_info("hunter2", decoded_host_bytes) == b"hidden message"
