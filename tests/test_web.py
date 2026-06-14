@@ -4,6 +4,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from stegpy import web
 from stegpy.web import app
 
 
@@ -147,3 +148,24 @@ def test_encode_and_decode_file_round_trip():
     assert decode_response.status_code == 200
     assert decode_response.headers["content-disposition"].endswith('filename="secret.txt"')
     assert decode_response.content == payload
+
+
+def test_encode_rejects_payload_over_demo_limit(monkeypatch):
+    host = create_png_bytes()
+    monkeypatch.setattr(web, "MAX_PAYLOAD_BYTES", 1024 * 1024)
+
+    response = client.post(
+        "/api/encode",
+        data={"mode": "file", "bits": "1"},
+        files={
+            "host": ("host.png", host, "image/png"),
+            "payload": (
+                "secret.bin",
+                b"x" * (1024 * 1024 + 1),
+                "application/octet-stream",
+            ),
+        },
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "secret.bin exceeds the 1 MB demo limit."

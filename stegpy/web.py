@@ -20,7 +20,7 @@ STATIC_ROOT = APP_ROOT / "web-demo"
 SUPPORTED_HOST_EXTENSIONS = {"png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"}
 ALLOWED_BITS = {1, 2, 4}
 MAX_HOST_BYTES = 20 * 1024 * 1024
-MAX_PAYLOAD_BYTES = 5 * 1024 * 1024
+MAX_PAYLOAD_BYTES = 20 * 1024 * 1024
 MAX_MESSAGE_BYTES = 1 * 1024 * 1024
 
 app = FastAPI(title="stegpy demo")
@@ -76,7 +76,10 @@ async def save_upload(upload, directory, max_bytes, fallback):
             if total > max_bytes:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"{filename} is too large for this demo.",
+                    detail=(
+                        f"{filename} exceeds the "
+                        f"{max_bytes // (1024 * 1024)} MB demo limit."
+                    ),
                 )
             output.write(chunk)
 

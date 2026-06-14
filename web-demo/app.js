@@ -2,6 +2,8 @@
 
 const SUPPORTED_HOSTS = new Set(["png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"]);
 const HEADER_SIZE = 11;
+const MAX_HOST_BYTES = 20 * 1024 * 1024;
+const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
 
 function extensionFor(file) {
   return (file?.name.split(".").pop() || "").toLowerCase();
@@ -41,11 +43,21 @@ async function postForm(url, formData) {
 
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
-    try {
-      const error = await response.json();
-      message = error.detail || message;
-    } catch {
-      message = await response.text() || message;
+    const body = await response.text();
+
+    if (body) {
+      try {
+        const error = JSON.parse(body);
+        message = error.detail || message;
+      } catch {
+        if (response.status !== 413 && !body.trim().startsWith("<")) {
+          message = body;
+        }
+      }
+    }
+
+    if (response.status === 413 && message === `${response.status} ${response.statusText}`) {
+      message = "Upload is too large. Host and payload files are limited to 20 MB each.";
     }
     throw new Error(message);
   }
@@ -188,6 +200,11 @@ function setupDemo() {
       return;
     }
 
+    if (file.size > MAX_HOST_BYTES) {
+      setStatus("Host files are limited to 20 MB.", true);
+      return;
+    }
+
     const extension = extensionFor(file);
     if (!SUPPORTED_HOSTS.has(extension)) {
       setStatus("Choose a PNG, BMP, GIF, WebP, WAV, JPG, or JPEG host file.", true);
@@ -220,7 +237,13 @@ function setupDemo() {
   hostInput.addEventListener("change", () => loadHost(hostInput.files[0]));
   payloadModeInput.addEventListener("change", updatePayloadMode);
   messageInput.addEventListener("input", updateStats);
-  payloadInput.addEventListener("change", updateStats);
+  payloadInput.addEventListener("change", () => {
+    const payload = payloadInput.files[0];
+    if (payload?.size > MAX_PAYLOAD_BYTES) {
+      setStatus("Payload files are limited to 20 MB.", true);
+    }
+    updateStats();
+  });
   bitsInput.addEventListener("change", refreshCapacity);
   encodeTab.addEventListener("click", () => switchMode("encode"));
   decodeTab.addEventListener("click", () => switchMode("decode"));
@@ -243,6 +266,9 @@ function setupDemo() {
       }
       if (selectedMode() === "file" && !payloadInput.files[0]) {
         throw new Error("Choose a payload file.");
+      }
+      if (payloadInput.files[0]?.size > MAX_PAYLOAD_BYTES) {
+        throw new Error("Payload files are limited to 20 MB.");
       }
 
       encodeButton.disabled = true;
