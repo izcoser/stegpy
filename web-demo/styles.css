@@ -473,10 +473,8 @@ dd {
 }
 
 .site-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
+  display: grid;
+  gap: 5px;
   margin-top: 24px;
   padding: 14px 2px 0;
   border-top: 1px solid var(--border);
@@ -485,10 +483,13 @@ dd {
 }
 
 .site-footer code {
+  display: block;
+  max-width: 100%;
   overflow-wrap: anywhere;
   color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 920px) {
@@ -543,9 +544,4 @@ dd {
     grid-template-columns: 1fr;
   }
 
-  .site-footer {
-    align-items: start;
-    flex-direction: column;
-    gap: 8px;
-  }
 }
