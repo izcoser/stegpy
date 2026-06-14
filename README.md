@@ -32,20 +32,19 @@ JPEG hosts use DCT-coefficient embedding. Unsupported image formats are automati
 * jpeglib
 ***
 ## Installation
-```sh
- pip3 install stegpy
-```
 
-To run from a local checkout instead of installing from PyPI:
+Installing from the Git repository is the preferred method. The release
+currently published on PyPI is severely outdated and does not include recent
+features and fixes.
 
 ```sh
- git clone https://github.com/dhsdshdhk/stegpy.git
+ git clone https://github.com/izcoser/stegpy.git
  cd stegpy
  uv sync --dev
  uv run stegpy -h
 ```
 
-You can also install the checkout into your current Python environment:
+To install the current source checkout into another Python environment:
 
 ```sh
  pip install .
