@@ -24,14 +24,21 @@ def create_jpeg_host(path, size=(128, 128)):
 
 
 def create_gif_host(path):
-    palette = []
-    for index in range(256):
-        palette.extend([index, (index * 3) % 256, 255 - index])
+    first_pixels = np.zeros((24, 24, 3), dtype=np.uint8)
+    first_pixels[:, :, 0] = 255
+    second_pixels = np.zeros((24, 24, 3), dtype=np.uint8)
+    second_pixels[:, :, 1] = 255
 
-    pixels = np.arange(24 * 24, dtype=np.uint8).reshape(24, 24)
-    first = Image.fromarray(pixels, mode="P")
-    first.putpalette(palette)
-    first.save(path, save_all=True, duration=80, loop=0)
+    first = Image.fromarray(first_pixels, mode="RGB")
+    second = Image.fromarray(second_pixels, mode="RGB")
+    first.save(
+        path,
+        save_all=True,
+        append_images=[second],
+        duration=[80, 120],
+        loop=0,
+        optimize=False,
+    )
 
 
 def create_wav_host(path, size=12000):

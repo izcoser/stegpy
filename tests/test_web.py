@@ -21,11 +21,22 @@ def create_png_bytes(size=(32, 32)):
 
 
 def create_gif_bytes(size=(24, 24)):
-    pixels = np.arange(size[0] * size[1], dtype=np.uint8).reshape(
-        size[1], size[0]
-    )
+    first_pixels = np.zeros((size[1], size[0], 3), dtype=np.uint8)
+    first_pixels[:, :, 0] = 255
+    second_pixels = np.zeros((size[1], size[0], 3), dtype=np.uint8)
+    second_pixels[:, :, 1] = 255
     output = io.BytesIO()
-    Image.fromarray(pixels, mode="P").save(output, format="GIF")
+    first = Image.fromarray(first_pixels, mode="RGB")
+    second = Image.fromarray(second_pixels, mode="RGB")
+    first.save(
+        output,
+        format="GIF",
+        save_all=True,
+        append_images=[second],
+        duration=[80, 120],
+        loop=0,
+        optimize=False,
+    )
     output.seek(0)
     return output.getvalue()
 
@@ -50,7 +61,7 @@ def test_capacity_endpoint_reports_png_capacity():
     assert response.json()["capacityBytes"] == 32 * 32 * 3 * 2 // 8
 
 
-def test_capacity_endpoint_accepts_gif_without_duration_metadata():
+def test_capacity_endpoint_accepts_mixed_mode_gif_frames():
     host = create_gif_bytes()
 
     response = client.post(
@@ -60,7 +71,7 @@ def test_capacity_endpoint_accepts_gif_without_duration_metadata():
     )
 
     assert response.status_code == 200
-    assert response.json()["capacityBytes"] == 24 * 24 * 2 // 8
+    assert response.json()["capacityBytes"] == 2 * 24 * 24 * 2 // 8
 
 
 def test_encode_and_decode_text_round_trip():

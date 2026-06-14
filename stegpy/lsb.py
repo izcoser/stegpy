@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Module for processing images, audios and the least significant bits.
 
+import contextlib
 import os.path
+import threading
 
 import jpeglib
 import numpy
-from PIL import Image
+from PIL import GifImagePlugin, Image
 
 try:
     from . import crypt
@@ -85,6 +87,20 @@ JPEG_ZIGZAG_ORDER = [
 JPEG_ZIGZAG_OFFSETS = numpy.asarray(
     [row * 8 + col for row, col in JPEG_ZIGZAG_ORDER[1:]], dtype=numpy.int64
 )
+GIF_LOADING_LOCK = threading.Lock()
+
+
+@contextlib.contextmanager
+def preserve_gif_palette_indices():
+    with GIF_LOADING_LOCK:
+        previous = GifImagePlugin.LOADING_STRATEGY
+        GifImagePlugin.LOADING_STRATEGY = (
+            GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
+        )
+        try:
+            yield
+        finally:
+            GifImagePlugin.LOADING_STRATEGY = previous
 
 
 def get_format(filename):
@@ -110,7 +126,8 @@ class HostElement:
             sound.tofile(self.filename)
         elif self.format.lower() == "gif":
             gif = []
-            for frame, palette in zip(self.data, self.header[0]):
+            palette = self.header[0]
+            for frame in self.data:
                 image = Image.fromarray(frame, mode="P")
                 image.putpalette(palette)
                 gif.append(image)
@@ -118,8 +135,10 @@ class HostElement:
                 self.filename,
                 save_all=len(gif) > 1,
                 append_images=gif[1:],
-                loop=0,
+                loop=self.header[2],
                 duration=self.header[1],
+                optimize=False,
+                palette=palette,
             )
         elif is_jpeg_format(self.format):
             self.header.write_dct(self.filename)
@@ -201,17 +220,7 @@ def get_file(filename):
         content = numpy.fromfile(filename, dtype=numpy.uint8)
         content = content[:10000], content[10000:]
     elif filename.lower().endswith("gif"):
-        image = Image.open(filename)
-        frames = []
-        palettes = []
-        try:
-            while True:
-                frames.append(numpy.array(image))
-                palettes.append(image.getpalette())
-                image.seek(image.tell() + 1)
-        except EOFError:
-            pass
-        content = [palettes, image.info.get("duration", 100)], numpy.asarray(frames)
+        content = get_gif_file(filename)
     elif is_jpeg_format(get_format(filename)):
         jpeg = jpeglib.read_dct(filename)
         content = jpeg, get_jpeg_channels(jpeg)
@@ -221,6 +230,98 @@ def get_file(filename):
             image = image.convert("RGB")
         content = None, numpy.array(image)
     return content
+
+
+def get_gif_file(filename):
+    with preserve_gif_palette_indices():
+        image = Image.open(filename)
+        frames = []
+        durations = []
+        palette = image.getpalette()
+        loop = image.info.get("loop", 0)
+        try:
+            while True:
+                if image.mode != "P":
+                    break
+                frames.append(numpy.array(image))
+                durations.append(image.info.get("duration", 100))
+                image.seek(image.tell() + 1)
+        except EOFError:
+            frames, palette = normalize_gif_palette(numpy.asarray(frames), palette)
+            return [palette, durations, loop], frames
+
+        frame_count = image.n_frames
+        sample_side = max(16, min(96, int((1_000_000 / frame_count) ** 0.5)))
+        sample_pixels = []
+        durations = []
+        image.seek(0)
+
+        for frame_index in range(frame_count):
+            image.seek(frame_index)
+            frame = image.convert("RGB")
+            sample = frame.copy()
+            sample.thumbnail((sample_side, sample_side))
+            sample_pixels.append(numpy.asarray(sample).reshape(-1, 3))
+            durations.append(image.info.get("duration", 100))
+
+        samples = numpy.concatenate(sample_pixels)
+        palette_image = Image.fromarray(samples.reshape(1, -1, 3), mode="RGB").quantize(
+            colors=256, method=Image.Quantize.MEDIANCUT
+        )
+        palette = palette_image.getpalette()
+        frames = []
+        image.seek(0)
+
+        for frame_index in range(frame_count):
+            image.seek(frame_index)
+            frame = image.convert("RGB").quantize(
+                palette=palette_image, dither=Image.Dither.NONE
+            )
+            frames.append(numpy.asarray(frame))
+
+        frames, palette = normalize_gif_palette(numpy.asarray(frames), palette)
+        return [palette, durations, loop], frames
+
+
+def normalize_gif_palette(frames, palette):
+    palette = list(palette or [])
+    colors = [
+        tuple(palette[index : index + 3])
+        for index in range(0, len(palette) - 2, 3)
+    ][:256]
+    remap = numpy.arange(256, dtype=numpy.uint8)
+    first_index = {}
+    reserved = set()
+
+    for index, color in enumerate(colors):
+        if color in first_index:
+            remap[index] = first_index[color]
+        else:
+            first_index[color] = index
+            reserved.add(color)
+
+    frames = remap[frames]
+    normalized = []
+    next_color = 0
+
+    for index in range(256):
+        if index < len(colors) and remap[index] == index:
+            normalized.extend(colors[index])
+            continue
+
+        while True:
+            color = (
+                next_color >> 16 & 255,
+                next_color >> 8 & 255,
+                next_color & 255,
+            )
+            next_color += 1
+            if color not in reserved:
+                reserved.add(color)
+                normalized.extend(color)
+                break
+
+    return frames, normalized
 
 
 def get_jpeg_channels(jpeg):
