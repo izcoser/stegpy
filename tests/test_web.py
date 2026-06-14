@@ -20,6 +20,16 @@ def create_png_bytes(size=(32, 32)):
     return output.getvalue()
 
 
+def create_gif_bytes(size=(24, 24)):
+    pixels = np.arange(size[0] * size[1], dtype=np.uint8).reshape(
+        size[1], size[0]
+    )
+    output = io.BytesIO()
+    Image.fromarray(pixels, mode="P").save(output, format="GIF")
+    output.seek(0)
+    return output.getvalue()
+
+
 def test_health_endpoint():
     response = client.get("/api/health")
 
@@ -38,6 +48,19 @@ def test_capacity_endpoint_reports_png_capacity():
 
     assert response.status_code == 200
     assert response.json()["capacityBytes"] == 32 * 32 * 3 * 2 // 8
+
+
+def test_capacity_endpoint_accepts_gif_without_duration_metadata():
+    host = create_gif_bytes()
+
+    response = client.post(
+        "/api/capacity",
+        data={"bits": "2"},
+        files={"host": ("host.gif", host, "image/gif")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["capacityBytes"] == 24 * 24 * 2 // 8
 
 
 def test_encode_and_decode_text_round_trip():

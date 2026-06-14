@@ -211,7 +211,7 @@ def get_file(filename):
                 image.seek(image.tell() + 1)
         except EOFError:
             pass
-        content = [palettes, image.info["duration"]], numpy.asarray(frames)
+        content = [palettes, image.info.get("duration", 100)], numpy.asarray(frames)
     elif is_jpeg_format(get_format(filename)):
         jpeg = jpeglib.read_dct(filename)
         content = jpeg, get_jpeg_channels(jpeg)

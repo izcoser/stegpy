@@ -87,11 +87,6 @@ You can also run it locally by opening `web-demo/index.html`.
 
 The hosted demo supports PNG, BMP, GIF, WebP, WAV, and JPEG hosts, text or file
 payloads, and optional password encryption.
-***
-## To do
-* Add docstrings
-* Allow encoding across multiple files
-* Support FLAC as a host
 
 ***
 ## Support
