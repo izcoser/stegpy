@@ -1,7 +1,6 @@
 "use strict";
 
 const SUPPORTED_HOSTS = new Set(["png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"]);
-const HEADER_SIZE = 11;
 const MAX_HOST_BYTES = 20 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -30,9 +29,9 @@ function formatBytes(bytes) {
 
 function payloadEstimate(mode, text, file) {
   if (mode === "file") {
-    return HEADER_SIZE + (file?.name.length || 0) + (file?.size || 0);
+    return file?.size || 0;
   }
-  return HEADER_SIZE + new TextEncoder().encode(text).length;
+  return new TextEncoder().encode(text).length;
 }
 
 async function postForm(url, formData) {
@@ -107,6 +106,7 @@ function setupDemo() {
   const decodePanel = document.getElementById("decode-panel");
   let currentHost = null;
   let capacityRequestId = 0;
+  let capacityEncrypted = false;
 
   function setStatus(message, isError = false, isSuccess = false) {
     statusOutput.textContent = message;
@@ -150,6 +150,9 @@ function setupDemo() {
     const formData = new FormData();
     formData.append("host", currentHost);
     formData.append("bits", String(selectedBits()));
+    formData.append("mode", selectedMode());
+    formData.append("filename", payloadInput.files[0]?.name || "");
+    formData.append("encrypted", String(Boolean(encodePasswordInput.value)));
     capacityOutput.textContent = "Checking...";
 
     try {
@@ -235,7 +238,10 @@ function setupDemo() {
   }
 
   hostInput.addEventListener("change", () => loadHost(hostInput.files[0]));
-  payloadModeInput.addEventListener("change", updatePayloadMode);
+  payloadModeInput.addEventListener("change", () => {
+    updatePayloadMode();
+    refreshCapacity();
+  });
   messageInput.addEventListener("input", updateStats);
   payloadInput.addEventListener("change", () => {
     const payload = payloadInput.files[0];
@@ -243,8 +249,16 @@ function setupDemo() {
       setStatus("Payload files are limited to 20 MB.", true);
     }
     updateStats();
+    refreshCapacity();
   });
   bitsInput.addEventListener("change", refreshCapacity);
+  encodePasswordInput.addEventListener("input", () => {
+    const encrypted = Boolean(encodePasswordInput.value);
+    if (encrypted !== capacityEncrypted) {
+      capacityEncrypted = encrypted;
+      refreshCapacity();
+    }
+  });
   encodeTab.addEventListener("click", () => switchMode("encode"));
   decodeTab.addEventListener("click", () => switchMode("decode"));
 

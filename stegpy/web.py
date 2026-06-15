@@ -1,6 +1,3 @@
-import contextlib
-import io
-import os
 import re
 import shutil
 import tempfile
@@ -11,6 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
 
 from . import crypt, lsb
 
@@ -22,18 +20,9 @@ ALLOWED_BITS = {1, 2, 4}
 MAX_HOST_BYTES = 20 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 20 * 1024 * 1024
 MAX_MESSAGE_BYTES = 1 * 1024 * 1024
+PAYLOAD_HEADER_BYTES = 11
 
 app = FastAPI(title="stegpy demo")
-
-
-@contextlib.contextmanager
-def working_directory(path):
-    previous = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(previous)
 
 
 def safe_filename(filename, fallback):
@@ -60,6 +49,44 @@ def validate_host_name(filename):
             status_code=400,
             detail=f"Unsupported host format. Use one of: {supported}.",
         )
+
+
+def embedded_filename_bytes(mode, filename=""):
+    if mode == "text":
+        return b""
+    if mode != "file":
+        raise HTTPException(status_code=400, detail="Mode must be text or file.")
+
+    encoded = safe_filename(filename, "payload.bin").encode("utf-8")
+    if len(encoded) > 255:
+        raise HTTPException(
+            status_code=400,
+            detail="The embedded filename must be at most 255 bytes.",
+        )
+    return encoded
+
+
+def encoded_payload_size(payload_bytes, filename_bytes=b"", encrypted=False):
+    formatted_size = PAYLOAD_HEADER_BYTES + len(filename_bytes) + payload_bytes
+    if encrypted:
+        return crypt.encrypted_info_size(formatted_size)
+    return formatted_size
+
+
+def usable_payload_capacity(carrier_bytes, filename_bytes=b"", encrypted=False):
+    low = 0
+    high = max(0, carrier_bytes)
+
+    while low < high:
+        candidate = (low + high + 1) // 2
+        if encoded_payload_size(candidate, filename_bytes, encrypted) <= carrier_bytes:
+            low = candidate
+        else:
+            high = candidate - 1
+
+    if encoded_payload_size(low, filename_bytes, encrypted) > carrier_bytes:
+        return 0
+    return low
 
 
 async def save_upload(upload, directory, max_bytes, fallback):
@@ -124,11 +151,9 @@ def parse_message(raw_message, password):
     return embedded_filename, bytes(message[payload_start:payload_end])
 
 
-def run_with_stdout_capture(callback):
-    output = io.StringIO()
+def run_processing(callback):
     try:
-        with contextlib.redirect_stdout(output):
-            return callback(), output.getvalue()
+        return callback()
     except SystemExit as exc:
         raise HTTPException(status_code=400, detail="Payload does not fit in host file.") from exc
     except HTTPException:
@@ -143,21 +168,38 @@ def health():
 
 
 @app.post("/api/capacity")
-async def capacity(host: UploadFile = File(...), bits: int = Form(2)):
+async def capacity(
+    host: UploadFile = File(...),
+    bits: int = Form(2),
+    mode: str = Form("text"),
+    filename: str = Form(""),
+    encrypted: bool = Form(False),
+):
     validate_bits(bits)
     validate_host_name(host.filename)
+    filename_bytes = embedded_filename_bytes(mode, filename)
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:
         host_path = await save_upload(host, workdir, MAX_HOST_BYTES, "host")
 
         def calculate():
-            with working_directory(workdir):
-                return lsb.HostElement(host_path.name).free_space(bits)
+            return lsb.HostElement(str(host_path)).free_space(bits)
 
-        free_bytes, logs = run_with_stdout_capture(calculate)
+        carrier_bytes = await run_in_threadpool(run_processing, calculate)
+        capacity_bytes = usable_payload_capacity(
+            carrier_bytes,
+            filename_bytes=filename_bytes,
+            encrypted=encrypted,
+        )
         return JSONResponse(
-            {"capacityBytes": free_bytes, "bits": bits, "logs": logs},
+            {
+                "capacityBytes": capacity_bytes,
+                "carrierCapacityBytes": carrier_bytes,
+                "bits": bits,
+                "mode": mode,
+                "encrypted": encrypted,
+            },
             background=BackgroundTask(shutil.rmtree, workdir, ignore_errors=True),
         )
     except Exception:
@@ -183,6 +225,7 @@ async def encode(
         embedded_filename = None
 
         if mode == "text":
+            embedded_filename_bytes(mode)
             payload_bytes = message.encode("utf-8")
             if len(payload_bytes) > MAX_MESSAGE_BYTES:
                 raise HTTPException(status_code=413, detail="Message is too large.")
@@ -190,27 +233,27 @@ async def encode(
             if payload is None or not payload.filename:
                 raise HTTPException(status_code=400, detail="Choose a payload file.")
             embedded_filename = safe_filename(payload.filename, "payload.bin")
+            embedded_filename_bytes(mode, embedded_filename)
             payload_path = await save_upload(
                 payload, workdir, MAX_PAYLOAD_BYTES, embedded_filename
             )
             payload_bytes = payload_path.read_bytes()
         else:
-            raise HTTPException(status_code=400, detail="Mode must be text or file.")
+            embedded_filename_bytes(mode)
 
         def encode_file():
-            with working_directory(workdir):
-                element = lsb.HostElement(host_path.name)
-                element.insert_message(
-                    payload_bytes,
-                    bits=bits,
-                    parasite_filename=embedded_filename,
-                    password=password or None,
-                )
-                element.save()
-                return Path(element.filename)
+            element = lsb.HostElement(str(host_path))
+            element.insert_message(
+                payload_bytes,
+                bits=bits,
+                parasite_filename=embedded_filename,
+                password=password or None,
+            )
+            output_path = workdir / f"_{host_path.name}"
+            element.save(output_path)
+            return Path(element.filename)
 
-        output_relative_path, _ = run_with_stdout_capture(encode_file)
-        output_path = workdir / output_relative_path
+        output_path = await run_in_threadpool(run_processing, encode_file)
         if not output_path.exists():
             raise HTTPException(status_code=500, detail="Encoded output was not created.")
 
@@ -233,11 +276,12 @@ async def decode(host: UploadFile = File(...), password: str = Form("")):
         host_path = await save_upload(host, workdir, MAX_HOST_BYTES, "host")
 
         def extract():
-            with working_directory(workdir):
-                element = lsb.HostElement(host_path.name)
-                return parse_message(decode_payload(element), password or None)
+            element = lsb.HostElement(str(host_path))
+            return parse_message(decode_payload(element), password or None)
 
-        embedded_filename, payload_bytes = run_with_stdout_capture(extract)[0]
+        embedded_filename, payload_bytes = await run_in_threadpool(
+            run_processing, extract
+        )
 
         if embedded_filename:
             filename = safe_filename(embedded_filename, "payload.bin")

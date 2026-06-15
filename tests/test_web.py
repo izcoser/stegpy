@@ -49,7 +49,7 @@ def test_health_endpoint():
     assert response.json() == {"ok": True, "service": "stegpy"}
 
 
-def test_capacity_endpoint_reports_png_capacity():
+def test_capacity_endpoint_reports_usable_text_capacity():
     host = create_png_bytes()
 
     response = client.post(
@@ -59,7 +59,39 @@ def test_capacity_endpoint_reports_png_capacity():
     )
 
     assert response.status_code == 200
-    assert response.json()["capacityBytes"] == 32 * 32 * 3 * 2 // 8
+    assert response.json() == {
+        "capacityBytes": 32 * 32 * 3 * 2 // 8 - 11,
+        "carrierCapacityBytes": 32 * 32 * 3 * 2 // 8,
+        "bits": 2,
+        "mode": "text",
+        "encrypted": False,
+    }
+
+
+def test_capacity_endpoint_accounts_for_filename_and_encryption():
+    host = create_png_bytes()
+
+    response = client.post(
+        "/api/capacity",
+        data={
+            "bits": "2",
+            "mode": "file",
+            "filename": "secret.bin",
+            "encrypted": "true",
+        },
+        files={"host": ("host.png", host, "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    filename = b"secret.bin"
+    assert data["carrierCapacityBytes"] == 768
+    assert web.encoded_payload_size(
+        data["capacityBytes"], filename, encrypted=True
+    ) <= 768
+    assert web.encoded_payload_size(
+        data["capacityBytes"] + 1, filename, encrypted=True
+    ) > 768
 
 
 def test_capacity_endpoint_accepts_mixed_mode_gif_frames():
@@ -72,7 +104,38 @@ def test_capacity_endpoint_accepts_mixed_mode_gif_frames():
     )
 
     assert response.status_code == 200
-    assert response.json()["capacityBytes"] == 2 * 24 * 24 * 2 // 8
+    assert response.json()["capacityBytes"] == 2 * 24 * 24 * 2 // 8 - 11
+
+
+def test_web_processing_runs_in_threadpool(monkeypatch):
+    calls = []
+
+    async def fake_run_in_threadpool(function, *args):
+        calls.append(function)
+        return function(*args)
+
+    monkeypatch.setattr(web, "run_in_threadpool", fake_run_in_threadpool)
+    host = create_png_bytes()
+
+    with TestClient(app) as test_client:
+        capacity_response = test_client.post(
+            "/api/capacity",
+            files={"host": ("host.png", host, "image/png")},
+        )
+        encode_response = test_client.post(
+            "/api/encode",
+            data={"mode": "text", "message": "threaded", "bits": "2"},
+            files={"host": ("host.png", host, "image/png")},
+        )
+        decode_response = test_client.post(
+            "/api/decode",
+            files={"host": ("_host.png", encode_response.content, "image/png")},
+        )
+
+    assert capacity_response.status_code == 200
+    assert encode_response.status_code == 200
+    assert decode_response.status_code == 200
+    assert calls == [web.run_processing, web.run_processing, web.run_processing]
 
 
 def test_encode_and_decode_text_round_trip():

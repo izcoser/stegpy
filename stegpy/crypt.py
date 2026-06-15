@@ -4,6 +4,7 @@
 import base64
 import os
 import string
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -31,6 +32,14 @@ def encrypt_info(password, info):
     f = Fernet(key)
     token = f.encrypt(info)
     return bytes(salt) + bytes(token)
+
+
+def encrypted_info_size(info_length):
+    """Return the salt-prefixed Fernet size for a plaintext byte length."""
+    padded_length = (info_length // 16 + 1) * 16
+    raw_token_length = 57 + padded_length
+    encoded_token_length = 4 * ((raw_token_length + 2) // 3)
+    return 16 + encoded_token_length
 
 
 def decrypt_info(password, token, salt):

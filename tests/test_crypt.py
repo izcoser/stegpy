@@ -15,6 +15,13 @@ def test_encrypt_info_uses_random_salt():
     assert first != second
 
 
+def test_encrypted_info_size_matches_fernet_output():
+    for info_length in [0, 1, 15, 16, 17, 100, 245, 246]:
+        encrypted = crypt.encrypt_info("hunter2", b"x" * info_length)
+
+        assert crypt.encrypted_info_size(info_length) == len(encrypted)
+
+
 def test_decrypt_embedded_info_ignores_decoded_host_trailing_bytes():
     token = crypt.encrypt_info("hunter2", b"hidden message")
     decoded_host_bytes = token + b"\x00\xffnot part of the token"

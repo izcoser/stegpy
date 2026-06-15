@@ -119,8 +119,8 @@ class HostElement:
         self.format = get_format(filename)
         self.header, self.data = get_file(filename)
 
-    def save(self):
-        self.filename = "_" + self.filename
+    def save(self, filename=None):
+        self.filename = os.fspath(filename) if filename else "_" + self.filename
         if self.format.lower() == "wav":
             sound = numpy.concatenate((self.header, self.data))
             sound.tofile(self.filename)

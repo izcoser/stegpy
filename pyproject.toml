@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dhsdshdhk/stegpy"
+Homepage = "https://github.com/izcoser/stegpy"
 
 [project.scripts]
 stegpy = "stegpy.steg:main"

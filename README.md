@@ -7,8 +7,8 @@
 A program for encoding information in image and audio files through steganography. Any type of data can be encoded, from raw strings to files, as shown below:
 
 <p align="middle">
-  <img src="https://github.com/kamihfkjkf/stegpy/blob/master/images/house.png?raw=true"/>
-  <img src="https://github.com/kamihfkjkf/stegpy/blob/master/images/_cat.jpeg?raw=true"/>
+  <img src="https://github.com/izcoser/stegpy/blob/master/images/house.png?raw=true"/>
+  <img src="https://github.com/izcoser/stegpy/blob/master/images/_cat.jpeg?raw=true"/>
 </p>
 
 On the left, a house with a steganographically hidden image. On the right, the extracted hidden image of a cat. It is revealed by removing all but the least significant bit of each color component in the host image.
@@ -22,7 +22,9 @@ On the left, a house with a steganographically hidden image. On the right, the e
 * WebP
 * WAV
 
-JPEG hosts use DCT-coefficient embedding. Unsupported image formats are automatically converted to PNG. Different audio formats are not supported at all.
+JPEG hosts use DCT-coefficient embedding. On the CLI, other Pillow-readable image
+formats are converted to PNG when saved. The web API accepts only the formats
+listed above. WAV is the only supported audio format.
 
 ***
 ## Dependencies
@@ -30,6 +32,9 @@ JPEG hosts use DCT-coefficient embedding. Unsupported image formats are automati
 * cryptography
 * Pillow (PIL fork)
 * jpeglib
+* FastAPI
+* python-multipart
+* Uvicorn
 ***
 ## Installation
 
@@ -83,10 +88,24 @@ Hello World!
 A live demo backed by the Python package is available at
 <https://stegpy.coseri.xyz>.
 
-You can also run it locally by opening `web-demo/index.html`.
+Run the FastAPI application and browser demo locally from the repository:
+
+```sh
+ uv run uvicorn stegpy.web:app --reload
+```
+
+Then open <http://127.0.0.1:8000>. The static files in `web-demo/` require the
+FastAPI `/api/*` backend and do not work by opening `index.html` directly.
 
 The hosted demo supports PNG, BMP, GIF, WebP, WAV, and JPEG hosts, text or file
-payloads, and optional password encryption.
+payloads, and optional password encryption. Host and file payload uploads are
+limited to 20 MB; text messages are limited to 1 MB. Its capacity display shows
+usable payload bytes after the stegpy header, embedded filename, and encryption
+overhead.
+
+The API also exposes `GET /api/health`, `POST /api/capacity`,
+`POST /api/encode`, and `POST /api/decode`. Interactive API documentation is
+available at <http://127.0.0.1:8000/docs> when running locally.
 
 ***
 ## Support
