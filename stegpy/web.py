@@ -1,5 +1,6 @@
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -14,7 +15,11 @@ from . import crypt, lsb
 
 
 APP_ROOT = Path(__file__).resolve().parent.parent
-STATIC_ROOT = APP_ROOT / "web-demo"
+SOURCE_STATIC_ROOT = APP_ROOT / "web-demo"
+INSTALLED_STATIC_ROOT = Path(sys.prefix) / "web-demo"
+STATIC_ROOT = (
+    SOURCE_STATIC_ROOT if SOURCE_STATIC_ROOT.exists() else INSTALLED_STATIC_ROOT
+)
 SUPPORTED_HOST_EXTENSIONS = {"png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"}
 ALLOWED_BITS = {1, 2, 4}
 MAX_HOST_BYTES = 20 * 1024 * 1024

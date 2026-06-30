@@ -34,6 +34,14 @@ stegpy = "stegpy.steg:main"
 [tool.setuptools.packages.find]
 include = ["stegpy*"]
 
+[tool.setuptools.data-files]
+"web-demo" = [
+    "web-demo/app.js",
+    "web-demo/favicon.png",
+    "web-demo/index.html",
+    "web-demo/styles.css",
+]
+
 [dependency-groups]
 dev = [
     "httpx>=0.24; python_version < '3.10'",

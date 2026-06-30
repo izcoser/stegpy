@@ -38,22 +38,20 @@ listed above. WAV is the only supported audio format.
 ***
 ## Installation
 
-Installing from the Git repository is the preferred method. The release
-currently published on PyPI is severely outdated and does not include recent
-features and fixes.
+Install or upgrade the current release from PyPI with Python's package manager:
+
+```sh
+ python -m pip install --upgrade stegpy
+ stegpy -h
+```
+
+For development, clone the repository and create the environment with `uv`:
 
 ```sh
  git clone https://github.com/izcoser/stegpy.git
  cd stegpy
  uv sync --dev
  uv run stegpy -h
-```
-
-To install the current source checkout into another Python environment:
-
-```sh
- pip install .
- stegpy -h
 ```
 ***
 ## Usage:
