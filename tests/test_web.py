@@ -1,6 +1,7 @@
 import io
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -17,6 +18,19 @@ def create_png_bytes(size=(32, 32)):
     )
     output = io.BytesIO()
     Image.fromarray(pixels).save(output, format="PNG")
+    output.seek(0)
+    return output.getvalue()
+
+
+def create_jpeg_bytes(size=(128, 128)):
+    y = np.arange(size[1], dtype=np.uint16).reshape(size[1], 1)
+    x = np.arange(size[0], dtype=np.uint16).reshape(1, size[0])
+    pixels = np.empty((size[1], size[0], 3), dtype=np.uint8)
+    pixels[:, :, 0] = ((x * 7) + (y * 13)) % 256
+    pixels[:, :, 1] = ((x * 11) ^ (y * 5)) % 256
+    pixels[:, :, 2] = ((x * 3) + (y * 17) + ((x * y) % 31)) % 256
+    output = io.BytesIO()
+    Image.fromarray(pixels).save(output, format="JPEG", quality=95, subsampling=0)
     output.seek(0)
     return output.getvalue()
 
@@ -66,6 +80,47 @@ def test_capacity_endpoint_reports_usable_text_capacity():
         "mode": "text",
         "encrypted": False,
     }
+
+
+@pytest.mark.parametrize("bits", [1, 2, 4])
+def test_capacity_endpoint_reports_file_capacity_across_lsb_bit_depths(bits):
+    host = create_png_bytes()
+    filename = b"secret.bin"
+
+    response = client.post(
+        "/api/capacity",
+        data={"bits": str(bits), "mode": "file", "filename": filename.decode()},
+        files={"host": ("host.png", host, "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    expected_carrier_capacity = 32 * 32 * 3 * bits // 8
+    assert data["carrierCapacityBytes"] == expected_carrier_capacity
+    assert data["capacityBytes"] == (
+        expected_carrier_capacity - web.PAYLOAD_HEADER_BYTES - len(filename)
+    )
+
+
+@pytest.mark.parametrize("bits", [1, 2, 4])
+def test_capacity_endpoint_reports_file_capacity_across_jpeg_bit_depths(bits):
+    host = create_jpeg_bytes()
+    filename = b"secret.bin"
+
+    response = client.post(
+        "/api/capacity",
+        data={"bits": str(bits), "mode": "file", "filename": filename.decode()},
+        files={"host": ("host.jpg", host, "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert web.encoded_payload_size(data["capacityBytes"], filename) <= data[
+        "carrierCapacityBytes"
+    ]
+    assert web.encoded_payload_size(data["capacityBytes"] + 1, filename) > data[
+        "carrierCapacityBytes"
+    ]
 
 
 def test_capacity_endpoint_accounts_for_filename_and_encryption():

@@ -221,7 +221,7 @@ class HostElement:
     def print_free_space(self, bits=2):
         free = self.free_space(bits)
         print(
-            "File: {}, free: (bytes) {:,}, encoding: 4 bit".format(
+            "File: {}, free: (bytes) {:,}, encoding: {} bit".format(
                 self.filename, free, bits
             )
         )

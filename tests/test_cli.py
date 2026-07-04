@@ -69,4 +69,16 @@ def test_cli_check_reports_capacity(tmp_path, monkeypatch, capsys):
     output = capsys.readouterr().out
 
     assert "File: host.png, free: (bytes)" in output
-    assert "encoding: 4 bit" in output
+    assert "encoding: 2 bit" in output
+
+
+def test_cli_check_reports_selected_bit_depth(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    create_rgb_host("host.png")
+
+    monkeypatch.setattr(sys, "argv", ["stegpy", "host.png", "-c", "-b", "1"])
+    steg.main()
+    output = capsys.readouterr().out
+
+    assert "File: host.png, free: (bytes)" in output
+    assert "encoding: 1 bit" in output

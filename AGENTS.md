@@ -107,7 +107,6 @@
 
 ## Known Quirks / Risks
 - The codebase uses broad `except:` imports and decryption error handling.
-- `HostElement.print_free_space()` hardcodes the string `encoding: 4 bit` even though the method accepts other bit depths.
 - `check_message_space()` and `check_magic_number()` call `exit(-1)` instead of raising structured exceptions.
 - WAV support is simplistic because of the fixed `10000`-byte split.
 - GIF palette/duration handling is intentionally basic and should stay covered by end-to-end tests.

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from stegpy import lsb
 from stegpy.lsb import HostElement
 
 
@@ -44,6 +45,41 @@ def create_gif_host(path):
 
 def create_wav_host(path, size=12000):
     Path(path).write_bytes(b"RIFF" + b"\x00" * (size - 4))
+
+
+def assert_lsb_capacity_boundary(filename, bits):
+    host = HostElement(filename)
+    capacity = host.free_space(bits)
+
+    lsb.encode_message(host.data.copy(), b"x" * capacity, bits)
+
+    with pytest.raises(SystemExit):
+        lsb.encode_message(host.data.copy(), b"x" * (capacity + 1), bits)
+
+
+@pytest.mark.parametrize("bits", [1, 2, 4])
+def test_lsb_free_space_matches_encoding_boundary(tmp_path, monkeypatch, bits):
+    monkeypatch.chdir(tmp_path)
+    create_rgb_host("host.png", size=(41, 37))
+    create_gif_host("host.gif")
+    create_wav_host("host.wav", size=22345)
+
+    for filename in ["host.png", "host.gif", "host.wav"]:
+        assert_lsb_capacity_boundary(filename, bits)
+
+
+@pytest.mark.parametrize("bits", [1, 2, 4])
+def test_jpeg_free_space_matches_encoding_boundary(tmp_path, monkeypatch, bits):
+    monkeypatch.chdir(tmp_path)
+    create_jpeg_host("host.jpg")
+    capacity = HostElement("host.jpg").free_space(bits)
+
+    lsb.encode_jpeg_message(HostElement("host.jpg").data, b"x" * capacity, bits)
+
+    with pytest.raises(SystemExit):
+        lsb.encode_jpeg_message(
+            HostElement("host.jpg").data, b"x" * (capacity + 1), bits
+        )
 
 
 def test_png_text_round_trip(tmp_path, monkeypatch, capsys):
