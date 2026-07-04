@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stegpy"
-version = "0.1.0"
+version = "0.2.0"
 description = "A program for encoding information in image and audio files through steganography."
 readme = "README.md"
 requires-python = ">=3.8"
