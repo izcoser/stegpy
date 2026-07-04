@@ -15,6 +15,22 @@ def test_encode_decode_round_trip_across_bit_depths(bits):
     assert bytes(decoded[: len(message)]) == message
 
 
+def test_decode_message_handles_empty_host_data():
+    decoded = lsb.decode_message(np.zeros(0, dtype=np.uint8))
+
+    assert decoded.size == 0
+
+
+def test_decode_message_does_not_overflow_on_large_uint8_hosts():
+    host = np.zeros(1_898_640, dtype=np.uint8)
+    host[0] = 16
+
+    decoded = lsb.decode_message(host)
+
+    assert decoded.dtype == np.uint8
+    assert decoded.size == 474_660
+
+
 def test_format_message_for_text_payload():
     message = b"hello"
     encoded_length = len(message).to_bytes(4, "big")

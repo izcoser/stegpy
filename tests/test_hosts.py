@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from stegpy.lsb import HostElement
@@ -81,6 +82,26 @@ def test_png_file_round_trip(tmp_path, monkeypatch, capsys):
 
     assert Path("_secret.bin").read_bytes() == payload
     assert "File _secret.bin succesfully extracted from _host.png" in read_output
+
+
+def test_png_binary_payload_without_filename_is_written_to_file(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    create_rgb_host("host.png")
+    payload = b"\x9d\xff\x00binary payload"
+
+    host = HostElement("host.png")
+    host.insert_message(payload, bits=2)
+    host.save()
+    capsys.readouterr()
+
+    extracted = HostElement("_host.png")
+    extracted.read_message()
+    read_output = capsys.readouterr().out
+
+    assert Path("_message.bin").read_bytes() == payload
+    assert "Decoded payload is not valid UTF-8; wrote raw bytes to _message.bin" in read_output
 
 
 def test_png_encrypted_round_trip(tmp_path, monkeypatch, capsys):
@@ -212,3 +233,15 @@ def test_wav_text_round_trip(tmp_path, monkeypatch, capsys):
     output = capsys.readouterr().out
 
     assert "audio payload" in output
+
+
+def test_empty_wav_decode_reports_no_payload(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    create_wav_host("host.wav", size=10000)
+
+    host = HostElement("host.wav")
+    with pytest.raises(SystemExit):
+        host.read_message()
+    output = capsys.readouterr().out
+
+    assert "ERROR! No encoded info found!" in output

@@ -184,7 +184,20 @@ class HostElement:
             filename = "_" + bytes(msg[11:end_filename]).decode("utf-8")
 
         else:
-            text = bytes(msg[start:end]).decode("utf-8")
+            payload = bytes(msg[start:end])
+            try:
+                text = payload.decode("utf-8")
+            except UnicodeDecodeError:
+                filename = "_message.bin"
+                with open(filename, "wb") as f:
+                    f.write(payload)
+                print(
+                    "Decoded payload is not valid UTF-8; wrote raw bytes to {}".format(
+                        filename
+                    )
+                )
+                return
+
             print(text)
             return
 
@@ -526,8 +539,11 @@ def check_message_space(max_message_len, message_len):
 
 def decode_message(host_data):
     """Decodes the image numpy array into a byte array."""
-    host_data.shape = (-1,)  # convert to 1D
-    bits = 2 ** int((host_data[0] & 48) >> 4)  # bits = 2 ^ (5th and 6th bits)
+    host_data = host_data.reshape(-1)  # convert to 1D
+    if host_data.size == 0:
+        return numpy.zeros(0, dtype=numpy.uint8)
+
+    bits = 2 ** int((int(host_data[0]) & 48) >> 4)  # bits = 2 ^ (5th and 6th bits)
     divisor = 8 // bits
 
     if host_data.size % divisor != 0:
