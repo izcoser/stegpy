@@ -35,7 +35,9 @@ listed above. WAV is the only supported audio format.
 Video hosts are decoded with FFmpeg, embedded frame-by-frame with a robust DCT
 signal, and written back as MP4/H.264. The video decoder is intended for files
 created by stegpy's video encoder; arbitrary videos without a stegpy payload will
-not decode useful data.
+not decode useful data. Video processing is intentionally disabled on the hosted
+public web demo because it can be CPU intensive; use the CLI or run the web app
+locally for video hosts.
 
 ***
 ## Dependencies
@@ -123,11 +125,15 @@ Run the FastAPI application and browser demo locally from the repository:
 Then open <http://127.0.0.1:8000>. The static files in `web-demo/` require the
 FastAPI `/api/*` backend and do not work by opening `index.html` directly.
 
-The hosted demo supports PNG, BMP, GIF, WebP, WAV, JPEG, and video hosts, text
-or file payloads, and optional password encryption. Image/audio host and file
-payload uploads are limited to 20 MB, video hosts are limited to 5 MB, and text
-messages are limited to 1 MB. Its capacity display shows usable payload bytes
-after the stegpy header, embedded filename, and encryption overhead.
+The hosted demo supports PNG, BMP, GIF, WebP, WAV, and JPEG hosts, text or file
+payloads, and optional password encryption. Image/audio host and file payload
+uploads are limited to 20 MB, and text messages are limited to 1 MB. Its capacity
+display shows usable payload bytes after the stegpy header, embedded filename,
+and encryption overhead.
+
+Video hosts are available in the web UI only when running on localhost because
+video processing can keep a small server CPU busy for minutes. The local web UI
+accepts video hosts up to 5 MB.
 
 The API also exposes `GET /api/health`, `POST /api/capacity`,
 `POST /api/encode`, and `POST /api/decode`. Interactive API documentation is

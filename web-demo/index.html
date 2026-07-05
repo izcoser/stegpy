@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>stegpy live demo</title>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-    <link rel="stylesheet" href="styles.css?v=video-preview-2">
+    <link rel="stylesheet" href="styles.css?v=local-video-1">
   </head>
   <body>
     <main class="page-shell">
@@ -33,7 +33,10 @@
       <section class="notice-card" aria-label="Supported features">
         <div>
           <strong>Supported hosts</strong>
-          <span>PNG, BMP, GIF, WebP, WAV, JPG, JPEG, MP4, M4V, MOV, MKV, WebM, AVI</span>
+          <span>PNG, BMP, GIF, WebP, WAV, JPG, JPEG</span>
+          <span class="notice-extra" id="video-availability-note">
+            Video hosts (MP4, M4V, MOV, MKV, WebM, AVI) are available only on localhost because processing is resource intensive.
+          </span>
         </div>
         <div>
           <strong>Payloads</strong>
@@ -48,11 +51,11 @@
               <p class="section-kicker">Step 1</p>
               <h2>Choose a host</h2>
             </div>
-            <span class="badge">video max 5 MB</span>
+            <span class="badge">video local only</span>
           </div>
 
           <div class="drop-zone" id="drop-zone">
-            <input id="host-input" type="file" accept=".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,.mp4,.m4v,.mov,.mkv,.webm,.avi,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo">
+            <input id="host-input" type="file" accept=".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave">
             <div class="drop-copy">
               <strong>Drop a host file here</strong>
               <span>20 MB for images/audio, 5 MB for video</span>
@@ -226,6 +229,6 @@
       </footer>
     </main>
 
-    <script src="app.js?v=video-preview-2"></script>
+    <script src="app.js?v=local-video-1"></script>
   </body>
 </html>

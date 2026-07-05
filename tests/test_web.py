@@ -10,7 +10,8 @@ from stegpy import web
 from stegpy.web import app
 
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://localhost")
+public_client = TestClient(app, base_url="https://stegpy.coseri.xyz")
 
 
 def create_png_bytes(size=(32, 32)):
@@ -125,12 +126,16 @@ def test_health_endpoint():
 
 def test_frontend_explains_video_dct_mode():
     html = client.get("/").text
-    script = client.get("/app.js?v=video-preview-2").text
+    script = client.get("/app.js?v=local-video-1").text
 
     assert "id=\"video-mode-note\"" in html
-    assert "styles.css?v=video-preview-2" in html
-    assert "app.js?v=video-preview-2" in html
+    assert "only on localhost" in html
+    assert "styles.css?v=local-video-1" in html
+    assert "app.js?v=local-video-1" in html
+    assert "accept=\".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,image/png" in html
     assert "isVideoMode" in script
+    assert "isLocalWebUi" in script
+    assert "VIDEO_ACCEPT" in script
     assert "usable (video DCT)" in script
 
 
@@ -247,6 +252,25 @@ def test_capacity_endpoint_reports_video_dct_capacity():
     expected_carrier_capacity = (30 * 20 * 18) // web.video.DEFAULT_REPETITION // 8
     assert data["carrierCapacityBytes"] == expected_carrier_capacity
     assert data["capacityBytes"] == expected_carrier_capacity - web.PAYLOAD_HEADER_BYTES
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "data"),
+    [
+        ("/api/capacity", {"bits": "2"}),
+        ("/api/encode", {"mode": "text", "message": "blocked"}),
+        ("/api/decode", {}),
+    ],
+)
+def test_public_demo_rejects_video_hosts(endpoint, data):
+    response = public_client.post(
+        endpoint,
+        data=data,
+        files={"host": ("host.mp4", b"not processed", "video/mp4")},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == web.PUBLIC_VIDEO_DISABLED_DETAIL
 
 
 def test_video_hosts_are_limited_to_5_mb():

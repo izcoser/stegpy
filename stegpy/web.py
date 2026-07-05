@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
@@ -30,6 +30,11 @@ SUPPORTED_HOST_EXTENSIONS = {
     "jpeg",
     *video.VIDEO_FORMATS,
 }
+LOCAL_WEB_HOSTS = {"localhost", "127.0.0.1", "::1"}
+PUBLIC_VIDEO_DISABLED_DETAIL = (
+    "Video processing is disabled on the hosted demo because it is resource "
+    "intensive. Run stegpy locally to use video hosts."
+)
 ALLOWED_BITS = {1, 2, 4}
 MAX_HOST_BYTES = 20 * 1024 * 1024
 MAX_VIDEO_HOST_BYTES = 5 * 1024 * 1024
@@ -140,6 +145,22 @@ def is_video_host(path_or_filename):
     return video.is_video_format(host_extension(path_or_filename))
 
 
+def request_hostname(request):
+    host = request.headers.get("host", "")
+    hostname = host.rsplit("@", 1)[-1].rsplit(":", 1)[0].strip("[]").lower()
+    return hostname or (request.url.hostname or "").lower()
+
+
+def is_local_web_request(request):
+    hostname = request_hostname(request)
+    return hostname in LOCAL_WEB_HOSTS or hostname.endswith(".localhost")
+
+
+def validate_video_web_access(filename, request):
+    if is_video_host(filename) and not is_local_web_request(request):
+        raise HTTPException(status_code=403, detail=PUBLIC_VIDEO_DISABLED_DETAIL)
+
+
 def host_upload_limit(filename):
     if is_video_host(filename):
         return MAX_VIDEO_HOST_BYTES
@@ -194,6 +215,7 @@ def health():
 
 @app.post("/api/capacity")
 async def capacity(
+    request: Request,
     host: UploadFile = File(...),
     bits: int = Form(2),
     mode: str = Form("text"),
@@ -202,6 +224,7 @@ async def capacity(
 ):
     validate_bits(bits)
     validate_host_name(host.filename)
+    validate_video_web_access(host.filename, request)
     filename_bytes = embedded_filename_bytes(mode, filename)
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
@@ -238,6 +261,7 @@ async def capacity(
 
 @app.post("/api/encode")
 async def encode(
+    request: Request,
     host: UploadFile = File(...),
     mode: str = Form("text"),
     message: str = Form(""),
@@ -247,6 +271,7 @@ async def encode(
 ):
     validate_bits(bits)
     validate_host_name(host.filename)
+    validate_video_web_access(host.filename, request)
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:
@@ -309,8 +334,11 @@ async def encode(
 
 
 @app.post("/api/decode")
-async def decode(host: UploadFile = File(...), password: str = Form("")):
+async def decode(
+    request: Request, host: UploadFile = File(...), password: str = Form("")
+):
     validate_host_name(host.filename)
+    validate_video_web_access(host.filename, request)
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:

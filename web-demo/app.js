@@ -1,20 +1,12 @@
 "use strict";
 
-const SUPPORTED_HOSTS = new Set([
-  "png",
-  "bmp",
-  "gif",
-  "webp",
-  "wav",
-  "jpg",
-  "jpeg",
-  "mp4",
-  "m4v",
-  "mov",
-  "mkv",
-  "webm",
-  "avi",
-]);
+const IMAGE_AUDIO_HOSTS = ["png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"];
+const VIDEO_HOSTS = ["mp4", "m4v", "mov", "mkv", "webm", "avi"];
+const SUPPORTED_HOSTS = new Set([...IMAGE_AUDIO_HOSTS, ...VIDEO_HOSTS]);
+const IMAGE_AUDIO_ACCEPT = ".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave";
+const VIDEO_ACCEPT = ".mp4,.m4v,.mov,.mkv,.webm,.avi,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo";
+const LOCAL_WEB_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const PUBLIC_VIDEO_DISABLED_MESSAGE = "Video processing is available only on localhost because it is resource intensive for the hosted demo.";
 const MAX_HOST_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_HOST_BYTES = 5 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
@@ -32,7 +24,7 @@ function isImageExtension(extension) {
 }
 
 function isVideoExtension(extension) {
-  return ["mp4", "m4v", "mov", "mkv", "webm", "avi"].includes(extension);
+  return VIDEO_HOSTS.includes(extension);
 }
 
 function isImageHost(file) {
@@ -49,6 +41,11 @@ function hostLimitFor(file) {
 
 function hostLimitDescription(file) {
   return isVideoHost(file) ? "Video host files are limited to 5 MB." : "Host files are limited to 20 MB.";
+}
+
+function isLocalWebUi() {
+  const hostname = window.location.hostname.toLowerCase();
+  return LOCAL_WEB_HOSTS.has(hostname) || hostname.endsWith(".localhost");
 }
 
 function isPreviewableImage(blob, filename) {
@@ -130,6 +127,7 @@ function filenameFromDisposition(disposition, fallback) {
 function setupDemo() {
   const hostInput = document.getElementById("host-input");
   const dropZone = document.getElementById("drop-zone");
+  const videoAvailabilityNote = document.getElementById("video-availability-note");
   const canvas = document.getElementById("preview-canvas");
   const previewVideo = document.getElementById("preview-video");
   const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -190,6 +188,7 @@ function setupDemo() {
   let hostPreviewUrl = "";
   let encodePreviewUrls = [];
   let decodePreviewUrls = [];
+  const videoEnabled = isLocalWebUi();
 
   const originalSlot = {
     image: originalResultImage,
@@ -476,8 +475,13 @@ function setupDemo() {
     }
 
     const extension = extensionFor(file);
+    if (isVideoHost(file) && !videoEnabled) {
+      rejectHost(PUBLIC_VIDEO_DISABLED_MESSAGE);
+      return;
+    }
+
     if (!SUPPORTED_HOSTS.has(extension)) {
-      rejectHost("Choose a PNG, BMP, GIF, WebP, WAV, JPG, JPEG, or video host file.");
+      rejectHost("Choose a PNG, BMP, GIF, WebP, WAV, JPG, or JPEG host file.");
       return;
     }
 
@@ -662,6 +666,13 @@ function setupDemo() {
       downloadBlob(decodedBlob, decodedFilename || "payload.bin");
     }
   });
+
+  if (!videoEnabled) {
+    hostInput.accept = IMAGE_AUDIO_ACCEPT;
+    videoAvailabilityNote.textContent = PUBLIC_VIDEO_DISABLED_MESSAGE;
+  } else {
+    hostInput.accept = `${IMAGE_AUDIO_ACCEPT},${VIDEO_ACCEPT}`;
+  }
 
   updatePayloadMode();
   updateStats();

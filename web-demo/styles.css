@@ -180,6 +180,11 @@ h3 {
   line-height: 1.45;
 }
 
+.notice-card .notice-extra {
+  display: block;
+  margin-top: 2px;
+}
+
 .tool-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);

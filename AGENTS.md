@@ -50,9 +50,10 @@
   - `POST /api/encode`
   - `POST /api/decode`
 - `web-demo/` is mounted at `/`; opening `web-demo/index.html` directly does not provide the required `/api/*` backend.
-- Image/audio host and file payload uploads are limited to 20 MB, video hosts are limited to 5 MB, and text messages are limited to 1 MB.
+- Image/audio host and file payload uploads are limited to 20 MB, local-web video hosts are limited to 5 MB, and text messages are limited to 1 MB.
 - `/api/capacity` reports raw usable payload bytes after accounting for the payload header, embedded filename, and optional Fernet encryption expansion.
 - The web API accepts only PNG, BMP, GIF, WebP, WAV, JPG, JPEG, MP4, M4V, MOV, MKV, WebM, and AVI hosts; unlike the CLI/library path, it does not accept arbitrary Pillow-readable image formats for conversion.
+- Video hosts are allowed only for local web requests (`localhost`, `127.0.0.1`, `::1`, and `*.localhost`). The hosted public demo rejects video hosts before saving uploads because FFmpeg processing can saturate the VPS for minutes.
 - Uploads and generated files are processed in temporary directories and removed by response background tasks.
 - `web-demo/` is installed as wheel data under the environment prefix; `stegpy.web` falls back to that location outside a source checkout.
 - Host parsing, capacity calculation, encoding, and decoding are dispatched through Starlette's thread pool so CPU-bound image/audio work does not block the event loop.
