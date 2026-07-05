@@ -141,7 +141,9 @@ function setupDemo() {
   const payloadField = document.getElementById("payload-field");
   const messageInput = document.getElementById("message-input");
   const payloadInput = document.getElementById("payload-input");
+  const bitsLabel = document.getElementById("bits-label");
   const bitsInput = document.getElementById("bits-input");
+  const videoModeNote = document.getElementById("video-mode-note");
   const capacityOutput = document.getElementById("capacity-output");
   const payloadOutput = document.getElementById("payload-output");
   const encodePasswordInput = document.getElementById("encode-password-input");
@@ -223,6 +225,10 @@ function setupDemo() {
 
   function selectedMode() {
     return payloadModeInput.value;
+  }
+
+  function isVideoMode() {
+    return Boolean(currentHost && isVideoHost(currentHost));
   }
 
   function revokePreviewUrls(urls) {
@@ -379,9 +385,13 @@ function setupDemo() {
 
   function updateStats() {
     const estimate = payloadEstimate(selectedMode(), messageInput.value, payloadInput.files[0]);
+    const videoMode = isVideoMode();
     payloadOutput.textContent = formatBytes(estimate);
     encodeButton.disabled = !currentHost;
     decodeButton.disabled = !currentHost;
+    bitsLabel.hidden = videoMode;
+    bitsInput.hidden = videoMode;
+    videoModeNote.hidden = !videoMode;
 
     if (!currentHost) {
       capacityOutput.textContent = "No host";
@@ -407,7 +417,9 @@ function setupDemo() {
       const response = await postForm("/api/capacity", formData);
       const data = await response.json();
       if (requestId === capacityRequestId) {
-        capacityOutput.textContent = formatBytes(data.capacityBytes);
+        capacityOutput.textContent = isVideoMode()
+          ? `${formatBytes(data.capacityBytes)} usable (video DCT)`
+          : formatBytes(data.capacityBytes);
       }
     } catch (error) {
       if (requestId === capacityRequestId) {

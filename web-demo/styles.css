@@ -290,8 +290,11 @@ canvas {
 
 #preview-video {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  height: auto;
   max-height: 438px;
+  object-fit: contain;
   background: #151311;
 }
 
@@ -510,7 +513,7 @@ dd {
 
 .comparison-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -548,9 +551,15 @@ dd {
 .media-frame img,
 .media-frame video {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  height: auto;
   max-height: 260px;
   object-fit: contain;
+}
+
+.media-frame video {
+  background: #151311;
 }
 
 .file-chip {

@@ -123,6 +123,17 @@ def test_health_endpoint():
     assert response.json() == {"ok": True, "service": "stegpy"}
 
 
+def test_frontend_explains_video_dct_mode():
+    html = client.get("/").text
+    script = client.get("/app.js?v=video-preview-2").text
+
+    assert "id=\"video-mode-note\"" in html
+    assert "styles.css?v=video-preview-2" in html
+    assert "app.js?v=video-preview-2" in html
+    assert "isVideoMode" in script
+    assert "usable (video DCT)" in script
+
+
 def test_capacity_endpoint_reports_usable_text_capacity():
     host = create_png_bytes()
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>stegpy live demo</title>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=video-preview-2">
   </head>
   <body>
     <main class="page-shell">
@@ -103,12 +103,15 @@
               <input id="payload-input" type="file">
             </div>
 
-            <label for="bits-input">LSB depth</label>
+            <label id="bits-label" for="bits-input">LSB depth</label>
             <select id="bits-input">
               <option value="1">1 bit</option>
               <option value="2" selected>2 bits</option>
               <option value="4">4 bits</option>
             </select>
+            <p class="panel-note" id="video-mode-note" hidden>
+              Video hosts use robust DCT embedding with repeated bits, so LSB depth does not apply.
+            </p>
 
             <dl class="stats">
               <div>
@@ -223,6 +226,6 @@
       </footer>
     </main>
 
-    <script src="app.js?v=video-dct-1"></script>
+    <script src="app.js?v=video-preview-2"></script>
   </body>
 </html>
