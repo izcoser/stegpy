@@ -33,7 +33,7 @@
       <section class="notice-card" aria-label="Supported features">
         <div>
           <strong>Supported hosts</strong>
-          <span>PNG, BMP, GIF, WebP, WAV, JPG, JPEG</span>
+          <span>PNG, BMP, GIF, WebP, WAV, JPG, JPEG, MP4, M4V, MOV, MKV, WebM, AVI</span>
         </div>
         <div>
           <strong>Payloads</strong>
@@ -48,19 +48,20 @@
               <p class="section-kicker">Step 1</p>
               <h2>Choose a host</h2>
             </div>
-            <span class="badge">max 20 MB</span>
+            <span class="badge">video max 5 MB</span>
           </div>
 
           <div class="drop-zone" id="drop-zone">
-            <input id="host-input" type="file" accept=".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave">
+            <input id="host-input" type="file" accept=".png,.bmp,.gif,.webp,.wav,.jpg,.jpeg,.mp4,.m4v,.mov,.mkv,.webm,.avi,image/png,image/bmp,image/gif,image/webp,image/jpeg,audio/wav,audio/wave,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo">
             <div class="drop-copy">
               <strong>Drop a host file here</strong>
-              <span>or click to browse</span>
+              <span>20 MB for images/audio, 5 MB for video</span>
             </div>
           </div>
 
           <div class="preview-wrap">
             <canvas id="preview-canvas" width="960" height="540" aria-label="Selected image preview"></canvas>
+            <video id="preview-video" controls playsinline muted hidden aria-label="Selected video preview"></video>
             <div class="file-preview" id="file-preview" hidden>
               <strong id="file-preview-name">No file selected</strong>
               <span id="file-preview-meta"></span>
@@ -148,6 +149,7 @@
                   <figcaption>Original host</figcaption>
                   <div class="media-frame">
                     <img id="original-result-image" alt="" hidden>
+                    <video id="original-result-video" controls playsinline muted hidden></video>
                     <div class="file-chip" id="original-result-file" hidden>
                       <strong id="original-result-name"></strong>
                       <span id="original-result-meta"></span>
@@ -158,6 +160,7 @@
                   <figcaption>Encoded host</figcaption>
                   <div class="media-frame">
                     <img id="encoded-result-image" alt="" hidden>
+                    <video id="encoded-result-video" controls playsinline muted hidden></video>
                     <div class="file-chip" id="encoded-result-file" hidden>
                       <strong id="encoded-result-name"></strong>
                       <span id="encoded-result-meta"></span>
@@ -198,6 +201,7 @@
               <p class="result-copy" id="decode-result-summary"></p>
               <div class="media-frame decoded-frame" id="decoded-file-preview" hidden>
                 <img id="decoded-result-image" alt="" hidden>
+                <video id="decoded-result-video" controls playsinline muted hidden></video>
                 <div class="file-chip" id="decoded-result-file" hidden>
                   <strong id="decoded-result-name"></strong>
                   <span id="decoded-result-meta"></span>
@@ -219,6 +223,6 @@
       </footer>
     </main>
 
-    <script src="app.js?v=preview-results-1"></script>
+    <script src="app.js?v=video-dct-1"></script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import io
+import subprocess
 
 import numpy as np
 import pytest
@@ -54,6 +55,65 @@ def create_gif_bytes(size=(24, 24)):
     )
     output.seek(0)
     return output.getvalue()
+
+
+def create_mp4_bytes(size=(240, 160), count=18):
+    if not web.video.ffmpeg_available():
+        pytest.skip("ffmpeg and ffprobe are required for video tests")
+
+    width, height = size
+    rng = np.random.default_rng(12)
+    frames = []
+
+    for index in range(count):
+        x = np.linspace(0, 255, width, dtype=np.float32)[None, :]
+        y = np.linspace(0, 255, height, dtype=np.float32)[:, None]
+        frame = np.empty((height, width, 3), dtype=np.float32)
+        frame[:, :, 0] = (x + index * 5) % 256
+        frame[:, :, 1] = (y + index * 3) % 256
+        frame[:, :, 2] = ((x + y) / 2 + index * 7) % 256
+        frame += rng.normal(0, 8, frame.shape)
+        frames.append(np.clip(frame, 0, 255).astype(np.uint8))
+
+    completed = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{width}x{height}",
+            "-r",
+            "12",
+            "-i",
+            "-",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "20",
+            "-preset",
+            "medium",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "frag_keyframe+empty_moov",
+            "-f",
+            "mp4",
+            "pipe:1",
+        ],
+        input=b"".join(frame.tobytes() for frame in frames),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        pytest.skip(completed.stderr.decode("utf-8", "replace"))
+
+    return completed.stdout
 
 
 def test_health_endpoint():
@@ -160,6 +220,39 @@ def test_capacity_endpoint_accepts_mixed_mode_gif_frames():
 
     assert response.status_code == 200
     assert response.json()["capacityBytes"] == 2 * 24 * 24 * 2 // 8 - 11
+
+
+def test_capacity_endpoint_reports_video_dct_capacity():
+    host = create_mp4_bytes()
+
+    response = client.post(
+        "/api/capacity",
+        data={"bits": "2"},
+        files={"host": ("host.mp4", host, "video/mp4")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    expected_carrier_capacity = (30 * 20 * 18) // web.video.DEFAULT_REPETITION // 8
+    assert data["carrierCapacityBytes"] == expected_carrier_capacity
+    assert data["capacityBytes"] == expected_carrier_capacity - web.PAYLOAD_HEADER_BYTES
+
+
+def test_video_hosts_are_limited_to_5_mb():
+    response = client.post(
+        "/api/capacity",
+        data={"bits": "2"},
+        files={
+            "host": (
+                "host.mp4",
+                b"x" * (web.MAX_VIDEO_HOST_BYTES + 1),
+                "video/mp4",
+            )
+        },
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "host.mp4 exceeds the 5 MB demo limit."
 
 
 def test_web_processing_runs_in_threadpool(monkeypatch):
@@ -287,3 +380,29 @@ def test_encode_rejects_payload_over_demo_limit(monkeypatch):
 
     assert response.status_code == 413
     assert response.json()["detail"] == "secret.bin exceeds the 1 MB demo limit."
+
+
+def test_encode_and_decode_video_text_round_trip():
+    host = create_mp4_bytes()
+
+    encode_response = client.post(
+        "/api/encode",
+        data={"mode": "text", "message": "hello from video web", "bits": "2"},
+        files={"host": ("host.mp4", host, "video/mp4")},
+    )
+
+    assert encode_response.status_code == 200
+    assert encode_response.headers["content-disposition"].endswith(
+        'filename="_host.mp4"'
+    )
+
+    decode_response = client.post(
+        "/api/decode",
+        files={"host": ("_host.mp4", encode_response.content, "video/mp4")},
+    )
+
+    assert decode_response.status_code == 200
+    assert decode_response.json() == {
+        "kind": "text",
+        "message": "hello from video web",
+    }

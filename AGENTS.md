@@ -5,9 +5,10 @@
 - Ignore `stegpy-rs/` unless the user explicitly asks about the Rust port. It is git-ignored and out of scope for normal work here.
 
 ## Project Summary
-- `stegpy` is a small Python steganography CLI/library and FastAPI application for hiding text or file payloads inside images and WAV audio.
+- `stegpy` is a small Python steganography CLI/library and FastAPI application for hiding text or file payloads inside images, WAV audio, and video.
 - PNG/BMP/GIF/WebP/WAV use the original least-significant-bit path.
 - JPEG/JPG now use a separate DCT-coefficient embedding path via `jpeglib`.
+- MP4/M4V/MOV/MKV/WebM/AVI use a separate decoded-frame video DCT path via FFmpeg and are saved as MP4/H.264.
 - The original package is centered around NumPy for byte-level manipulation, Pillow for image I/O, and `cryptography` for optional password-based encryption.
 - The public CLI entry point is `stegpy=stegpy.steg:main`.
 - The FastAPI application is exposed as `stegpy.web:app` and serves both `/api/*` endpoints and the static browser demo.
@@ -18,6 +19,7 @@
 - `setup.py`: minimal setuptools compatibility shim.
 - `stegpy/steg.py`: command-line interface.
 - `stegpy/lsb.py`: main host-file abstraction plus encode/decode logic.
+- `stegpy/video.py`: decoded-frame video DCT embedding and extraction through `ffmpeg`/`ffprobe`.
 - `stegpy/crypt.py`: password-based encryption/decryption helpers using PBKDF2 + Fernet.
 - `stegpy/web.py`: FastAPI upload, capacity, encode, and decode endpoints.
 - `web-demo/`: static HTML/CSS/JavaScript frontend served by the FastAPI application.
@@ -36,7 +38,8 @@
 4. If `-p/--password` is used, the formatted payload is encrypted before embedding.
 5. `encode_message()` writes payload bits into the host array using 1, 2, or 4 LSBs per host byte.
 6. JPEG hosts dispatch to a DCT-coefficient path that writes directly into quantized AC coefficients.
-7. Extraction reverses the process, then optionally decrypts and either prints text or writes a recovered file prefixed with `_`.
+7. Video hosts dispatch to `stegpy.video`, which decodes frames, writes repeated payload bits into 8x8 luminance DCT coefficient relationships, and re-encodes MP4/H.264 output.
+8. Extraction reverses the process, then optionally decrypts and either prints text or writes a recovered file prefixed with `_`.
 
 ## Web Application
 - Run the local application from a source checkout with:
@@ -47,9 +50,9 @@
   - `POST /api/encode`
   - `POST /api/decode`
 - `web-demo/` is mounted at `/`; opening `web-demo/index.html` directly does not provide the required `/api/*` backend.
-- Host and file payload uploads are limited to 20 MB, while text messages are limited to 1 MB.
+- Image/audio host and file payload uploads are limited to 20 MB, video hosts are limited to 5 MB, and text messages are limited to 1 MB.
 - `/api/capacity` reports raw usable payload bytes after accounting for the payload header, embedded filename, and optional Fernet encryption expansion.
-- The web API accepts only PNG, BMP, GIF, WebP, WAV, JPG, and JPEG hosts; unlike the CLI/library path, it does not accept arbitrary Pillow-readable image formats for conversion.
+- The web API accepts only PNG, BMP, GIF, WebP, WAV, JPG, JPEG, MP4, M4V, MOV, MKV, WebM, and AVI hosts; unlike the CLI/library path, it does not accept arbitrary Pillow-readable image formats for conversion.
 - Uploads and generated files are processed in temporary directories and removed by response background tasks.
 - `web-demo/` is installed as wheel data under the environment prefix; `stegpy.web` falls back to that location outside a source checkout.
 - Host parsing, capacity calculation, encoding, and decoding are dispatched through Starlette's thread pool so CPU-bound image/audio work does not block the event loop.
@@ -67,10 +70,17 @@
 - WAV:
   - The code reads raw bytes with NumPy and treats the first `10000` bytes as "header" and the remainder as mutable payload area.
   - This is a project-specific simplification, not a general WAV parser.
+- Video:
+  - Video support requires `ffmpeg` and `ffprobe` on PATH.
+  - Input containers are decoded to raw RGB frames, embedded through a DCT signal on luminance, and re-encoded as MP4/H.264 with `libx264`.
+  - Each payload bit is repeated and majority-voted on decode. This favors robustness over capacity.
+  - The decode guarantee is for videos created by stegpy's video encoder, not arbitrary videos that may have unrelated coefficient patterns.
 
 ## Important Implementation Details
-- `lsb.py` contains almost all behavior that matters.
+- `lsb.py` contains almost all image/audio/JPEG behavior that matters.
+- `video.py` contains the video backend and should remain separate from the legacy LSB host abstraction.
 - `HostElement.save()` always writes to a new filename by prefixing `_` to the original host path.
+- Video output also uses an underscore prefix, but always writes MP4/H.264, for example `clip.mov` becomes `_clip.mp4`.
 - `HostElement.read_message()` also prefixes extracted embedded filenames with `_`.
 - Bit depth is stored inside bits 5 and 6 of the first host byte, allowing the decoder to recover whether 1, 2, or 4 LSBs were used.
 - `encode_message()` flattens the NumPy array, writes the payload across interleaved positions, then restores the original shape.
@@ -88,6 +98,7 @@
   - Decode: `stegpy _image.png`
   - Check capacity: `stegpy file1 file2 -c`
 - `-b/--bits` accepts `1`, `2`, or `4` and defaults to `2`.
+- `-b/--bits` does not affect video hosts; video capacity is controlled by the DCT repetition preset in `stegpy.video`.
 - `-p/--password` enables encryption on write and decryption on read using interactive password prompts.
 - If the first positional argument is an existing file, the CLI embeds file contents; otherwise it treats it as a literal text message.
 
@@ -102,17 +113,19 @@
   - payload formatting
   - encryption helpers
   - CLI smoke tests
-  - end-to-end PNG, GIF, WAV, and JPEG host flows
-  - FastAPI health, capacity, encode/decode, encryption, file payload, GIF, and upload-limit behavior
+  - end-to-end PNG, GIF, WAV, JPEG, and video host flows
+  - FastAPI health, capacity, encode/decode, encryption, file payload, GIF, video, and upload-limit behavior
 
 ## Known Quirks / Risks
 - The codebase uses broad `except:` imports and decryption error handling.
 - `check_message_space()` and `check_magic_number()` call `exit(-1)` instead of raising structured exceptions.
 - WAV support is simplistic because of the fixed `10000`-byte split.
 - GIF palette/duration handling is intentionally basic and should stay covered by end-to-end tests.
+- Video support is intentionally conservative: capacity is much lower than image LSB because bits are repeated to survive H.264 compression.
 
 ## Practical Guidance For Future Agents
 - Start in `stegpy/lsb.py` if behavior changes touch encoding, capacity, host parsing, or extraction.
+- Start in `stegpy/video.py` for video carrier behavior, FFmpeg command changes, DCT tuning, or robustness/capacity changes.
 - Start in `stegpy/steg.py` if the task is mostly about CLI UX or argument parsing.
 - Start in `stegpy/web.py` and `tests/test_web.py` for API behavior, limits, temporary-file handling, or browser-demo integration.
 - Preserve current output behavior unless the user asks for cleanup; this project prints status directly and uses underscore-prefixed output filenames.

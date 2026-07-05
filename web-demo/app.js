@@ -1,7 +1,22 @@
 "use strict";
 
-const SUPPORTED_HOSTS = new Set(["png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"]);
+const SUPPORTED_HOSTS = new Set([
+  "png",
+  "bmp",
+  "gif",
+  "webp",
+  "wav",
+  "jpg",
+  "jpeg",
+  "mp4",
+  "m4v",
+  "mov",
+  "mkv",
+  "webm",
+  "avi",
+]);
 const MAX_HOST_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_HOST_BYTES = 5 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
 
 function extensionFor(file) {
@@ -16,12 +31,32 @@ function isImageExtension(extension) {
   return ["png", "bmp", "gif", "webp", "jpg", "jpeg"].includes(extension);
 }
 
+function isVideoExtension(extension) {
+  return ["mp4", "m4v", "mov", "mkv", "webm", "avi"].includes(extension);
+}
+
 function isImageHost(file) {
   return isImageExtension(extensionFor(file));
 }
 
+function isVideoHost(file) {
+  return isVideoExtension(extensionFor(file));
+}
+
+function hostLimitFor(file) {
+  return isVideoHost(file) ? MAX_VIDEO_HOST_BYTES : MAX_HOST_BYTES;
+}
+
+function hostLimitDescription(file) {
+  return isVideoHost(file) ? "Video host files are limited to 5 MB." : "Host files are limited to 20 MB.";
+}
+
 function isPreviewableImage(blob, filename) {
   return blob.type.startsWith("image/") || isImageExtension(extensionForName(filename));
+}
+
+function isPreviewableVideo(blob, filename) {
+  return blob.type.startsWith("video/") || isVideoExtension(extensionForName(filename));
 }
 
 function formatBytes(bytes) {
@@ -68,7 +103,7 @@ async function postForm(url, formData) {
     }
 
     if (response.status === 413 && message === `${response.status} ${response.statusText}`) {
-      message = "Upload is too large. Host and payload files are limited to 20 MB each.";
+      message = "Upload is too large. Image/audio hosts and payload files are limited to 20 MB; video hosts are limited to 5 MB.";
     }
     throw new Error(message);
   }
@@ -96,6 +131,7 @@ function setupDemo() {
   const hostInput = document.getElementById("host-input");
   const dropZone = document.getElementById("drop-zone");
   const canvas = document.getElementById("preview-canvas");
+  const previewVideo = document.getElementById("preview-video");
   const context = canvas.getContext("2d", { willReadFrequently: true });
   const filePreview = document.getElementById("file-preview");
   const filePreviewName = document.getElementById("file-preview-name");
@@ -124,10 +160,12 @@ function setupDemo() {
   const encodedUseButton = document.getElementById("encoded-use-button");
   const encodedDownloadButton = document.getElementById("encoded-download-button");
   const originalResultImage = document.getElementById("original-result-image");
+  const originalResultVideo = document.getElementById("original-result-video");
   const originalResultFile = document.getElementById("original-result-file");
   const originalResultName = document.getElementById("original-result-name");
   const originalResultMeta = document.getElementById("original-result-meta");
   const encodedResultImage = document.getElementById("encoded-result-image");
+  const encodedResultVideo = document.getElementById("encoded-result-video");
   const encodedResultFile = document.getElementById("encoded-result-file");
   const encodedResultName = document.getElementById("encoded-result-name");
   const encodedResultMeta = document.getElementById("encoded-result-meta");
@@ -136,6 +174,7 @@ function setupDemo() {
   const decodedDownloadButton = document.getElementById("decoded-download-button");
   const decodedFilePreview = document.getElementById("decoded-file-preview");
   const decodedResultImage = document.getElementById("decoded-result-image");
+  const decodedResultVideo = document.getElementById("decoded-result-video");
   const decodedResultFile = document.getElementById("decoded-result-file");
   const decodedResultName = document.getElementById("decoded-result-name");
   const decodedResultMeta = document.getElementById("decoded-result-meta");
@@ -146,23 +185,27 @@ function setupDemo() {
   let encodedFilename = "";
   let decodedBlob = null;
   let decodedFilename = "";
+  let hostPreviewUrl = "";
   let encodePreviewUrls = [];
   let decodePreviewUrls = [];
 
   const originalSlot = {
     image: originalResultImage,
+    video: originalResultVideo,
     file: originalResultFile,
     name: originalResultName,
     meta: originalResultMeta,
   };
   const encodedSlot = {
     image: encodedResultImage,
+    video: encodedResultVideo,
     file: encodedResultFile,
     name: encodedResultName,
     meta: encodedResultMeta,
   };
   const decodedSlot = {
     image: decodedResultImage,
+    video: decodedResultVideo,
     file: decodedResultFile,
     name: decodedResultName,
     meta: decodedResultMeta,
@@ -195,10 +238,39 @@ function setupDemo() {
     return url;
   }
 
+  function clearHostPreview() {
+    if (hostPreviewUrl) {
+      URL.revokeObjectURL(hostPreviewUrl);
+      hostPreviewUrl = "";
+    }
+    previewVideo.hidden = true;
+    previewVideo.pause();
+    previewVideo.removeAttribute("src");
+    previewVideo.removeAttribute("title");
+    previewVideo.load();
+    canvas.hidden = true;
+    filePreview.hidden = true;
+  }
+
+  function rejectHost(message) {
+    currentHost = null;
+    hostInput.value = "";
+    decodedOutput.value = "";
+    clearHostPreview();
+    clearEncodeResult();
+    clearDecodeResult();
+    updateStats();
+    setStatus(message, true);
+  }
+
   function resetMediaSlot(slot) {
     slot.image.hidden = true;
     slot.image.removeAttribute("src");
     slot.image.alt = "";
+    slot.video.hidden = true;
+    slot.video.pause();
+    slot.video.removeAttribute("src");
+    slot.video.load();
     slot.file.hidden = true;
     slot.name.textContent = "";
     slot.meta.textContent = "";
@@ -219,6 +291,12 @@ function setupDemo() {
       slot.image.src = trackedUrl(blob, urls);
       slot.image.alt = filename;
       slot.image.hidden = false;
+      return;
+    }
+
+    if (isPreviewableVideo(blob, filename)) {
+      slot.video.src = trackedUrl(blob, urls);
+      slot.video.hidden = false;
       return;
     }
 
@@ -340,13 +418,16 @@ function setupDemo() {
   }
 
   function showFilePreview(file) {
+    clearHostPreview();
     canvas.hidden = true;
+    previewVideo.hidden = true;
     filePreview.hidden = false;
     filePreviewName.textContent = file.name;
     filePreviewMeta.textContent = `${extensionFor(file).toUpperCase()} host, ${formatBytes(file.size)}`;
   }
 
   function drawImagePreview(file) {
+    clearHostPreview();
     const image = new Image();
     const url = URL.createObjectURL(file);
 
@@ -368,19 +449,28 @@ function setupDemo() {
     image.src = url;
   }
 
+  function drawVideoPreview(file) {
+    clearHostPreview();
+    hostPreviewUrl = URL.createObjectURL(file);
+    previewVideo.src = hostPreviewUrl;
+    previewVideo.title = file.name;
+    previewVideo.hidden = false;
+    previewVideo.load();
+  }
+
   function loadHost(file) {
     if (!file) {
       return;
     }
 
-    if (file.size > MAX_HOST_BYTES) {
-      setStatus("Host files are limited to 20 MB.", true);
+    const extension = extensionFor(file);
+    if (!SUPPORTED_HOSTS.has(extension)) {
+      rejectHost("Choose a PNG, BMP, GIF, WebP, WAV, JPG, JPEG, or video host file.");
       return;
     }
 
-    const extension = extensionFor(file);
-    if (!SUPPORTED_HOSTS.has(extension)) {
-      setStatus("Choose a PNG, BMP, GIF, WebP, WAV, JPG, or JPEG host file.", true);
+    if (file.size > hostLimitFor(file)) {
+      rejectHost(hostLimitDescription(file));
       return;
     }
 
@@ -390,6 +480,8 @@ function setupDemo() {
     clearDecodeResult();
     if (isImageHost(file)) {
       drawImagePreview(file);
+    } else if (isVideoHost(file)) {
+      drawVideoPreview(file);
     } else {
       showFilePreview(file);
     }

@@ -288,6 +288,13 @@ canvas {
   image-rendering: auto;
 }
 
+#preview-video {
+  display: block;
+  width: 100%;
+  max-height: 438px;
+  background: #151311;
+}
+
 canvas[hidden],
 .file-preview[hidden],
 [hidden] {
@@ -538,7 +545,8 @@ dd {
   min-height: 190px;
 }
 
-.media-frame img {
+.media-frame img,
+.media-frame video {
   display: block;
   width: 100%;
   max-height: 260px;

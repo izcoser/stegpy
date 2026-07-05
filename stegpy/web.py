@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
-from . import crypt, lsb
+from . import crypt, lsb, video
 
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -20,9 +20,19 @@ INSTALLED_STATIC_ROOT = Path(sys.prefix) / "web-demo"
 STATIC_ROOT = (
     SOURCE_STATIC_ROOT if SOURCE_STATIC_ROOT.exists() else INSTALLED_STATIC_ROOT
 )
-SUPPORTED_HOST_EXTENSIONS = {"png", "bmp", "gif", "webp", "wav", "jpg", "jpeg"}
+SUPPORTED_HOST_EXTENSIONS = {
+    "png",
+    "bmp",
+    "gif",
+    "webp",
+    "wav",
+    "jpg",
+    "jpeg",
+    *video.VIDEO_FORMATS,
+}
 ALLOWED_BITS = {1, 2, 4}
 MAX_HOST_BYTES = 20 * 1024 * 1024
+MAX_VIDEO_HOST_BYTES = 5 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 20 * 1024 * 1024
 MAX_MESSAGE_BYTES = 1 * 1024 * 1024
 PAYLOAD_HEADER_BYTES = 11
@@ -126,6 +136,16 @@ def decode_payload(host):
     return lsb.decode_message(host.data)
 
 
+def is_video_host(path_or_filename):
+    return video.is_video_format(host_extension(path_or_filename))
+
+
+def host_upload_limit(filename):
+    if is_video_host(filename):
+        return MAX_VIDEO_HOST_BYTES
+    return MAX_HOST_BYTES
+
+
 def parse_message(raw_message, password):
     message = raw_message
     if password:
@@ -186,9 +206,13 @@ async def capacity(
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:
-        host_path = await save_upload(host, workdir, MAX_HOST_BYTES, "host")
+        host_path = await save_upload(
+            host, workdir, host_upload_limit(host.filename), "host"
+        )
 
         def calculate():
+            if is_video_host(host_path):
+                return video.video_free_space(str(host_path))
             return lsb.HostElement(str(host_path)).free_space(bits)
 
         carrier_bytes = await run_in_threadpool(run_processing, calculate)
@@ -226,7 +250,9 @@ async def encode(
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:
-        host_path = await save_upload(host, workdir, MAX_HOST_BYTES, "host")
+        host_path = await save_upload(
+            host, workdir, host_upload_limit(host.filename), "host"
+        )
         embedded_filename = None
 
         if mode == "text":
@@ -247,6 +273,16 @@ async def encode(
             embedded_filename_bytes(mode)
 
         def encode_file():
+            if is_video_host(host_path):
+                output_path = workdir / f"_{host_path.stem}.mp4"
+                return video.insert_message(
+                    str(host_path),
+                    payload_bytes,
+                    parasite_filename=embedded_filename,
+                    password=password or None,
+                    output_filename=output_path,
+                )
+
             element = lsb.HostElement(str(host_path))
             element.insert_message(
                 payload_bytes,
@@ -278,9 +314,16 @@ async def decode(host: UploadFile = File(...), password: str = Form("")):
     workdir = Path(tempfile.mkdtemp(prefix="stegpy-"))
 
     try:
-        host_path = await save_upload(host, workdir, MAX_HOST_BYTES, "host")
+        host_path = await save_upload(
+            host, workdir, host_upload_limit(host.filename), "host"
+        )
 
         def extract():
+            if is_video_host(host_path):
+                return parse_message(
+                    video.decode_payload(str(host_path)), password or None
+                )
+
             element = lsb.HostElement(str(host_path))
             return parse_message(decode_payload(element), password or None)
 

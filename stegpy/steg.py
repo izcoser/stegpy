@@ -6,14 +6,15 @@ import os.path
 from getpass import getpass
 
 try:
-    from . import lsb
+    from . import lsb, video
 except:
     import lsb
+    import video
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple steganography program based on LSB and JPEG DCT methods."
+        description="Simple steganography program based on LSB, JPEG DCT, and video DCT methods."
     )
     parser.add_argument(
         "a", help="file or message to encode (if none, will read host)", nargs="*"
@@ -43,12 +44,16 @@ def main():
     if args.check:
         for arg in args.a + [args.b]:
             if os.path.isfile(arg):
-                lsb.HostElement(arg).print_free_space(bits)
+                if video.is_video_format(lsb.get_format(arg)):
+                    video.print_free_space(arg)
+                else:
+                    lsb.HostElement(arg).print_free_space(bits)
         return
 
     password = filename = None
     host_path = args.b
-    host = lsb.HostElement(host_path)
+    is_video_host = video.is_video_format(lsb.get_format(host_path))
+    host = None if is_video_host else lsb.HostElement(host_path)
 
     if args.a:
         args.a = args.a[0]
@@ -66,12 +71,23 @@ def main():
                 if password == password_2:
                     break
 
-        host.insert_message(message, bits, filename, password)
-        host.save()
+        if is_video_host:
+            video.insert_message(
+                host_path,
+                message,
+                parasite_filename=filename,
+                password=password,
+            )
+        else:
+            host.insert_message(message, bits, filename, password)
+            host.save()
     else:
         if args.password:
             password = getpass("Enter password (will not be echoed):")
-        host.read_message(password)
+        if is_video_host:
+            video.read_message(host_path, password)
+        else:
+            host.read_message(password)
 
 
 if __name__ == "__main__":
