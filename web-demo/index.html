@@ -124,13 +124,53 @@
             <input id="encode-password-input" type="password" autocomplete="off" placeholder="Encrypt payload">
 
             <button class="primary" id="encode-button" type="button" disabled>
-              Encode and download
+              Encode and preview
             </button>
+
+            <section class="result-card" id="encode-result" hidden>
+              <div class="result-header">
+                <div>
+                  <p class="section-kicker">Result</p>
+                  <h3>Original vs encoded</h3>
+                </div>
+                <div class="result-actions">
+                  <button class="secondary" id="encoded-use-button" type="button">
+                    Use for decode
+                  </button>
+                  <button class="secondary" id="encoded-download-button" type="button">
+                    Download encoded file
+                  </button>
+                </div>
+              </div>
+              <p class="result-copy" id="encode-result-summary"></p>
+              <div class="comparison-grid">
+                <figure class="media-card">
+                  <figcaption>Original host</figcaption>
+                  <div class="media-frame">
+                    <img id="original-result-image" alt="" hidden>
+                    <div class="file-chip" id="original-result-file" hidden>
+                      <strong id="original-result-name"></strong>
+                      <span id="original-result-meta"></span>
+                    </div>
+                  </div>
+                </figure>
+                <figure class="media-card">
+                  <figcaption>Encoded host</figcaption>
+                  <div class="media-frame">
+                    <img id="encoded-result-image" alt="" hidden>
+                    <div class="file-chip" id="encoded-result-file" hidden>
+                      <strong id="encoded-result-name"></strong>
+                      <span id="encoded-result-meta"></span>
+                    </div>
+                  </div>
+                </figure>
+              </div>
+            </section>
           </section>
 
           <section class="panel" id="decode-panel" role="tabpanel" aria-labelledby="decode-tab" hidden>
             <p class="panel-note">
-              Text payloads appear below. Embedded files download automatically.
+              Drop an encoded host, decode it, then preview hidden text, images, or files here.
             </p>
 
             <label for="decode-password-input">Password <span>if encrypted</span></label>
@@ -140,8 +180,30 @@
               Decode host
             </button>
 
-            <label for="decoded-output">Decoded text</label>
-            <textarea id="decoded-output" rows="10" readonly placeholder="Decoded text will appear here"></textarea>
+            <div id="decoded-text-field">
+              <label for="decoded-output">Decoded text</label>
+              <textarea id="decoded-output" rows="10" readonly placeholder="Decoded text will appear here"></textarea>
+            </div>
+
+            <section class="result-card" id="decode-result" hidden>
+              <div class="result-header">
+                <div>
+                  <p class="section-kicker">Result</p>
+                  <h3>Decoded payload</h3>
+                </div>
+                <button class="secondary" id="decoded-download-button" type="button" hidden>
+                  Download payload
+                </button>
+              </div>
+              <p class="result-copy" id="decode-result-summary"></p>
+              <div class="media-frame decoded-frame" id="decoded-file-preview" hidden>
+                <img id="decoded-result-image" alt="" hidden>
+                <div class="file-chip" id="decoded-result-file" hidden>
+                  <strong id="decoded-result-name"></strong>
+                  <span id="decoded-result-meta"></span>
+                </div>
+              </div>
+            </section>
           </section>
 
           <aside class="status-card" aria-live="polite">
@@ -157,6 +219,6 @@
       </footer>
     </main>
 
-    <script src="app.js?v=usable-capacity-1"></script>
+    <script src="app.js?v=preview-results-1"></script>
   </body>
 </html>

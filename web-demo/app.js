@@ -5,11 +5,23 @@ const MAX_HOST_BYTES = 20 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
 
 function extensionFor(file) {
-  return (file?.name.split(".").pop() || "").toLowerCase();
+  return extensionForName(file?.name || "");
+}
+
+function extensionForName(name) {
+  return (name.split(".").pop() || "").toLowerCase();
+}
+
+function isImageExtension(extension) {
+  return ["png", "bmp", "gif", "webp", "jpg", "jpeg"].includes(extension);
 }
 
 function isImageHost(file) {
-  return ["png", "bmp", "gif", "webp", "jpg", "jpeg"].includes(extensionFor(file));
+  return isImageExtension(extensionFor(file));
+}
+
+function isPreviewableImage(blob, filename) {
+  return blob.type.startsWith("image/") || isImageExtension(extensionForName(filename));
 }
 
 function formatBytes(bytes) {
@@ -69,8 +81,10 @@ function downloadBlob(blob, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function filenameFromDisposition(disposition, fallback) {
@@ -98,15 +112,61 @@ function setupDemo() {
   const decodePasswordInput = document.getElementById("decode-password-input");
   const encodeButton = document.getElementById("encode-button");
   const decodeButton = document.getElementById("decode-button");
+  const decodedTextField = document.getElementById("decoded-text-field");
   const decodedOutput = document.getElementById("decoded-output");
   const statusOutput = document.getElementById("status-output");
   const encodeTab = document.getElementById("encode-tab");
   const decodeTab = document.getElementById("decode-tab");
   const encodePanel = document.getElementById("encode-panel");
   const decodePanel = document.getElementById("decode-panel");
+  const encodeResult = document.getElementById("encode-result");
+  const encodeResultSummary = document.getElementById("encode-result-summary");
+  const encodedUseButton = document.getElementById("encoded-use-button");
+  const encodedDownloadButton = document.getElementById("encoded-download-button");
+  const originalResultImage = document.getElementById("original-result-image");
+  const originalResultFile = document.getElementById("original-result-file");
+  const originalResultName = document.getElementById("original-result-name");
+  const originalResultMeta = document.getElementById("original-result-meta");
+  const encodedResultImage = document.getElementById("encoded-result-image");
+  const encodedResultFile = document.getElementById("encoded-result-file");
+  const encodedResultName = document.getElementById("encoded-result-name");
+  const encodedResultMeta = document.getElementById("encoded-result-meta");
+  const decodeResult = document.getElementById("decode-result");
+  const decodeResultSummary = document.getElementById("decode-result-summary");
+  const decodedDownloadButton = document.getElementById("decoded-download-button");
+  const decodedFilePreview = document.getElementById("decoded-file-preview");
+  const decodedResultImage = document.getElementById("decoded-result-image");
+  const decodedResultFile = document.getElementById("decoded-result-file");
+  const decodedResultName = document.getElementById("decoded-result-name");
+  const decodedResultMeta = document.getElementById("decoded-result-meta");
   let currentHost = null;
   let capacityRequestId = 0;
   let capacityEncrypted = false;
+  let encodedBlob = null;
+  let encodedFilename = "";
+  let decodedBlob = null;
+  let decodedFilename = "";
+  let encodePreviewUrls = [];
+  let decodePreviewUrls = [];
+
+  const originalSlot = {
+    image: originalResultImage,
+    file: originalResultFile,
+    name: originalResultName,
+    meta: originalResultMeta,
+  };
+  const encodedSlot = {
+    image: encodedResultImage,
+    file: encodedResultFile,
+    name: encodedResultName,
+    meta: encodedResultMeta,
+  };
+  const decodedSlot = {
+    image: decodedResultImage,
+    file: decodedResultFile,
+    name: decodedResultName,
+    meta: decodedResultMeta,
+  };
 
   function setStatus(message, isError = false, isSuccess = false) {
     statusOutput.textContent = message;
@@ -120,6 +180,116 @@ function setupDemo() {
 
   function selectedMode() {
     return payloadModeInput.value;
+  }
+
+  function revokePreviewUrls(urls) {
+    for (const url of urls) {
+      URL.revokeObjectURL(url);
+    }
+    urls.length = 0;
+  }
+
+  function trackedUrl(blob, urls) {
+    const url = URL.createObjectURL(blob);
+    urls.push(url);
+    return url;
+  }
+
+  function resetMediaSlot(slot) {
+    slot.image.hidden = true;
+    slot.image.removeAttribute("src");
+    slot.image.alt = "";
+    slot.file.hidden = true;
+    slot.name.textContent = "";
+    slot.meta.textContent = "";
+  }
+
+  function mediaMeta(blob, filename) {
+    const extension = extensionForName(filename).toUpperCase();
+    const kind = extension || blob.type || "file";
+    return `${kind} · ${formatBytes(blob.size)}`;
+  }
+
+  function renderMediaSlot(slot, blob, filename, urls) {
+    resetMediaSlot(slot);
+    slot.name.textContent = filename;
+    slot.meta.textContent = mediaMeta(blob, filename);
+
+    if (isPreviewableImage(blob, filename)) {
+      slot.image.src = trackedUrl(blob, urls);
+      slot.image.alt = filename;
+      slot.image.hidden = false;
+      return;
+    }
+
+    slot.file.hidden = false;
+  }
+
+  function clearEncodeResult() {
+    revokePreviewUrls(encodePreviewUrls);
+    encodedBlob = null;
+    encodedFilename = "";
+    encodeResult.hidden = true;
+    encodeResultSummary.textContent = "";
+    encodedUseButton.disabled = true;
+    encodedDownloadButton.disabled = true;
+    resetMediaSlot(originalSlot);
+    resetMediaSlot(encodedSlot);
+  }
+
+  function clearDecodeResult() {
+    revokePreviewUrls(decodePreviewUrls);
+    decodedBlob = null;
+    decodedFilename = "";
+    decodeResult.hidden = true;
+    decodeResultSummary.textContent = "";
+    decodedDownloadButton.hidden = true;
+    decodedDownloadButton.disabled = true;
+    decodedFilePreview.hidden = true;
+    decodedTextField.hidden = false;
+    resetMediaSlot(decodedSlot);
+  }
+
+  function showEncodeResult(blob, filename) {
+    clearEncodeResult();
+    encodedBlob = blob;
+    encodedFilename = filename;
+    renderMediaSlot(originalSlot, currentHost, currentHost.name, encodePreviewUrls);
+    renderMediaSlot(encodedSlot, blob, filename, encodePreviewUrls);
+    encodeResultSummary.textContent = (
+      `Created ${filename} (${formatBytes(blob.size)}). ` +
+      "Compare it with the original, then download when ready."
+    );
+    encodedUseButton.disabled = false;
+    encodedDownloadButton.disabled = false;
+    encodeResult.hidden = false;
+    encodeResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function showDecodeText(message) {
+    clearDecodeResult();
+    decodedOutput.value = message;
+    decodeResultSummary.textContent = "Decoded a text payload from the selected host.";
+    decodeResult.hidden = false;
+    decodeResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function showDecodeFile(blob, filename) {
+    clearDecodeResult();
+    decodedBlob = blob;
+    decodedFilename = filename;
+    decodedOutput.value = "";
+    decodedTextField.hidden = true;
+    renderMediaSlot(decodedSlot, blob, filename, decodePreviewUrls);
+    decodedFilePreview.hidden = false;
+    decodedDownloadButton.hidden = false;
+    decodedDownloadButton.disabled = false;
+    decodeResultSummary.textContent = (
+      `Decoded ${filename} (${formatBytes(blob.size)}). ` +
+      "Preview it here, then download when ready."
+    );
+    decodeResult.hidden = false;
+    decodeResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function updatePayloadMode() {
@@ -216,6 +386,8 @@ function setupDemo() {
 
     currentHost = file;
     decodedOutput.value = "";
+    clearEncodeResult();
+    clearDecodeResult();
     if (isImageHost(file)) {
       drawImagePreview(file);
     } else {
@@ -239,11 +411,16 @@ function setupDemo() {
 
   hostInput.addEventListener("change", () => loadHost(hostInput.files[0]));
   payloadModeInput.addEventListener("change", () => {
+    clearEncodeResult();
     updatePayloadMode();
     refreshCapacity();
   });
-  messageInput.addEventListener("input", updateStats);
+  messageInput.addEventListener("input", () => {
+    clearEncodeResult();
+    updateStats();
+  });
   payloadInput.addEventListener("change", () => {
+    clearEncodeResult();
     const payload = payloadInput.files[0];
     if (payload?.size > MAX_PAYLOAD_BYTES) {
       setStatus("Payload files are limited to 20 MB.", true);
@@ -251,14 +428,19 @@ function setupDemo() {
     updateStats();
     refreshCapacity();
   });
-  bitsInput.addEventListener("change", refreshCapacity);
+  bitsInput.addEventListener("change", () => {
+    clearEncodeResult();
+    refreshCapacity();
+  });
   encodePasswordInput.addEventListener("input", () => {
+    clearEncodeResult();
     const encrypted = Boolean(encodePasswordInput.value);
     if (encrypted !== capacityEncrypted) {
       capacityEncrypted = encrypted;
       refreshCapacity();
     }
   });
+  decodePasswordInput.addEventListener("input", clearDecodeResult);
   encodeTab.addEventListener("click", () => switchMode("encode"));
   decodeTab.addEventListener("click", () => switchMode("decode"));
 
@@ -275,6 +457,7 @@ function setupDemo() {
 
   encodeButton.addEventListener("click", async () => {
     try {
+      clearEncodeResult();
       if (!currentHost) {
         throw new Error("Choose a host file first.");
       }
@@ -304,8 +487,8 @@ function setupDemo() {
         response.headers.get("content-disposition"),
         `_${currentHost.name}`
       );
-      downloadBlob(blob, filename);
-      setStatus(`Encoded ${filename}.`, false, true);
+      showEncodeResult(blob, filename);
+      setStatus(`Encoded ${filename}. Review it below before downloading.`, false, true);
     } catch (error) {
       setStatus(error.message, true);
     } finally {
@@ -315,6 +498,7 @@ function setupDemo() {
 
   decodeButton.addEventListener("click", async () => {
     try {
+      clearDecodeResult();
       if (!currentHost) {
         throw new Error("Choose a host file first.");
       }
@@ -331,7 +515,7 @@ function setupDemo() {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const data = await response.json();
-        decodedOutput.value = data.message;
+        showDecodeText(data.message);
         setStatus("Decoded text payload.", false, true);
       } else {
         const blob = await response.blob();
@@ -339,7 +523,7 @@ function setupDemo() {
           response.headers.get("content-disposition"),
           "payload.bin"
         );
-        downloadBlob(blob, filename);
+        showDecodeFile(blob, filename);
         setStatus(`Decoded embedded file ${filename}.`, false, true);
       }
     } catch (error) {
@@ -349,8 +533,36 @@ function setupDemo() {
     }
   });
 
+  encodedDownloadButton.addEventListener("click", () => {
+    if (encodedBlob) {
+      downloadBlob(encodedBlob, encodedFilename || `_${currentHost.name}`);
+    }
+  });
+
+  encodedUseButton.addEventListener("click", () => {
+    if (!encodedBlob) {
+      return;
+    }
+
+    const filename = encodedFilename || `_${currentHost.name}`;
+    const file = new File([encodedBlob], filename, {
+      type: encodedBlob.type || currentHost.type || "application/octet-stream",
+    });
+    switchMode("decode");
+    loadHost(file);
+    setStatus(`Loaded ${filename} for decoding.`, false, true);
+  });
+
+  decodedDownloadButton.addEventListener("click", () => {
+    if (decodedBlob) {
+      downloadBlob(decodedBlob, decodedFilename || "payload.bin");
+    }
+  });
+
   updatePayloadMode();
   updateStats();
+  clearEncodeResult();
+  clearDecodeResult();
 }
 
 if (typeof document !== "undefined") {
